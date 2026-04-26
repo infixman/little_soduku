@@ -1,11 +1,10 @@
 const appButtons = document.querySelectorAll("[data-app]");
 const sizeButtons = document.querySelectorAll("[data-size]");
-const modeButtons = document.querySelectorAll("[data-mode]");
 const difficultyButtons = document.querySelectorAll("[data-level]");
+const singleHintToggle = document.querySelector("#single-hint-toggle");
 const gradeButtons = document.querySelectorAll("[data-grade]");
 const operatorButtons = document.querySelectorAll("[data-operator]");
 const mazeSizeButtons = document.querySelectorAll("[data-maze-size]");
-const fogButtons = document.querySelectorAll("[data-fog-size]");
 const boardEl = document.querySelector("#board");
 const messageEl = document.querySelector("#message");
 const newGameButton = document.querySelector("#new-game");
@@ -42,25 +41,34 @@ const boxShapes = {
   8: { rows: 2, cols: 4 },
   9: { rows: 3, cols: 3 },
 };
+const sudokuSizes = Object.keys(boxShapes).map(Number);
 
 const mazeDirections = [
-  { key: "up", label: "上", row: -1, col: 0 },
-  { key: "right", label: "右", row: 0, col: 1 },
-  { key: "down", label: "下", row: 1, col: 0 },
-  { key: "left", label: "左", row: 0, col: -1 },
+  { key: "up", label: "⬆️", name: "上", row: -1, col: 0 },
+  { key: "right", label: "➡️", name: "右", row: 0, col: 1 },
+  { key: "down", label: "⬇️", name: "下", row: 1, col: 0 },
+  { key: "left", label: "⬅️", name: "左", row: 0, col: -1 },
 ];
+
+const mazeKeyDirections = {
+  ArrowUp: "up",
+  ArrowRight: "right",
+  ArrowDown: "down",
+  ArrowLeft: "left",
+};
 
 let size = 4;
 let mode = "sudoku";
 let level = "starter";
 let activeApp = "sudoku";
+let showSingleHints = false;
 let mazeGrade = 1;
-let mazeOperators = ["add", "subtract", "multiply", "divide"];
-let mazeSize = 5;
-let fogSize = 2;
+let mazeOperators = ["add"];
+let mazeSize = 7;
+const fogSize = 3;
 let mazePosition = { row: 0, col: 0 };
 let mazeRoute = [];
-let mazeOpenCells = new Set();
+let mazePassages = new Set();
 let mazeSeenCells = new Set();
 let playerPath = [];
 let abandonedPaths = [];
@@ -82,7 +90,7 @@ function startGame() {
     return;
   }
 
-  normalizeModeForSize();
+  syncModeFromApp();
   solution = buildSolution(size, puzzleIndex);
   board = hideCells(solution, levels[level], puzzleIndex);
   fixed = board.map((row) => row.map((value) => value !== 0));
@@ -92,10 +100,10 @@ function startGame() {
 
   boardEl.style.setProperty("--size", size);
   boardEl.style.setProperty("--choice-cols", size <= 4 ? 2 : 3);
-  boardEl.setAttribute("aria-label", `${size}x${size} 數獨棋盤`);
-  ruleLabel.textContent = `${size}x${size} ${hasBoxRule() ? "Sudoku" : "Number Grid"}`;
-  gameTitle.textContent = "小小數獨";
-  updateModeButtons();
+  boardEl.setAttribute("aria-label", `${size}x${size} ${getBoardGameName()}棋盤`);
+  if (ruleLabel) ruleLabel.textContent = `${size}x${size} ${getBoardGameName()}`;
+  if (gameTitle) gameTitle.textContent = getBoardGameTitle();
+  updateAppButtons();
 
   messageEl.textContent = hasBoxRule()
     ? "點空格，選一個同行、同列、同宮都沒出現的數字。"
@@ -106,15 +114,16 @@ function startGame() {
 
 function switchApp(nextApp) {
   activeApp = nextApp;
+  if (activeApp === "sudoku" && !canUseSudoku(size)) {
+    size = getDefaultSudokuSize();
+  }
   selected = null;
   hideMobileChoices();
-  appButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.app === activeApp);
-  });
-  sudokuGame.classList.toggle("is-hidden", activeApp !== "sudoku");
+  updateAppButtons();
+  sudokuGame.classList.toggle("is-hidden", activeApp === "maze");
   mazeGame.classList.toggle("is-hidden", activeApp !== "maze");
-  newGameButton.setAttribute("aria-label", activeApp === "sudoku" ? "換一題" : "重開迷宮");
-  newGameButton.setAttribute("title", activeApp === "sudoku" ? "換一題" : "重開迷宮");
+  newGameButton.setAttribute("aria-label", activeApp === "maze" ? "重開迷宮" : "換一題");
+  newGameButton.setAttribute("title", activeApp === "maze" ? "重開迷宮" : "換一題");
   startGame();
 }
 
@@ -174,11 +183,11 @@ function seededScore(row, col, seed) {
 }
 
 function startMaze() {
-  gameTitle.textContent = "算術迷宮";
-  ruleLabel.textContent = `${mazeGrade} 年級 ${getOperatorSummary()} ${mazeSize}x${mazeSize}`;
+  if (gameTitle) gameTitle.textContent = "算術迷宮";
+  if (ruleLabel) ruleLabel.textContent = `Lv.${mazeGrade} ${getOperatorSummary()} ${mazeSize}x${mazeSize}`;
   const generatedMaze = generateMazeMap(mazeSize, puzzleIndex);
   mazeRoute = generatedMaze.route;
-  mazeOpenCells = generatedMaze.openCells;
+  mazePassages = generatedMaze.passages;
   mazeSeenCells = new Set();
   mazePosition = { row: mazeRoute[0][0], col: mazeRoute[0][1] };
   playerPath = [{ ...mazePosition }];
@@ -191,53 +200,108 @@ function startMaze() {
 }
 
 function generateMazeMap(mapSize, seed) {
-  const route = buildMainRoute(mapSize, seed);
-  const openCells = new Set(route.map(([row, col]) => cellKey(row, col)));
-  const branchCount = Math.floor(mapSize * 1.6);
+  const attemptCount = Math.max(48, mapSize * mapSize);
+  let bestMaze = null;
+  let bestScore = -Infinity;
 
-  for (let branch = 0; branch < branchCount; branch += 1) {
-    const start = route[Math.floor(seededScore(branch, 11, seed) * route.length)];
-    let row = start[0];
-    let col = start[1];
-    const length = 1 + Math.floor(seededScore(branch, 12, seed) * Math.max(2, Math.floor(mapSize / 3)));
+  for (let attempt = 0; attempt < attemptCount; attempt += 1) {
+    const candidate = generateMazeCandidate(mapSize, seed * 97 + attempt * 31);
+    const score = scoreMazeCandidate(candidate, mapSize);
 
-    for (let step = 0; step < length; step += 1) {
-      const direction = mazeDirections[Math.floor(seededScore(branch, step + 13, seed) * mazeDirections.length)];
-      const nextRow = row + direction.row;
-      const nextCol = col + direction.col;
-      if (!isInMaze(nextRow, nextCol, mapSize)) break;
-
-      row = nextRow;
-      col = nextCol;
-      openCells.add(cellKey(row, col));
+    if (score > bestScore) {
+      bestMaze = candidate;
+      bestScore = score;
     }
   }
 
-  return { route, openCells };
+  return bestMaze;
 }
 
-function buildMainRoute(mapSize, seed) {
-  const route = [[0, 0]];
-  let row = 0;
-  let col = 0;
+function generateMazeCandidate(mapSize, seed) {
+  const passages = new Set();
+  const visited = new Set([cellKey(0, 0)]);
+  const stack = [{ row: 0, col: 0 }];
 
-  while (row !== mapSize - 1 || col !== mapSize - 1) {
-    const canGoRight = col < mapSize - 1;
-    const canGoDown = row < mapSize - 1;
-    const preferRight = seededScore(row, col, seed) > 0.46;
+  while (stack.length) {
+    const current = stack[stack.length - 1];
+    const nextDirections = mazeDirections
+      .map((direction) => ({
+        ...direction,
+        nextRow: current.row + direction.row,
+        nextCol: current.col + direction.col,
+      }))
+      .filter(({ nextRow, nextCol }) => isInMaze(nextRow, nextCol, mapSize) && !visited.has(cellKey(nextRow, nextCol)))
+      .sort((a, b) =>
+        seededScore(current.row * mapSize + current.col, directionScore(a), seed) -
+        seededScore(current.row * mapSize + current.col, directionScore(b), seed)
+      );
 
-    if (canGoRight && (!canGoDown || preferRight)) {
-      col += 1;
-    } else if (canGoDown) {
-      row += 1;
+    if (!nextDirections.length) {
+      stack.pop();
     } else {
-      col += 1;
+      const next = nextDirections[0];
+      addPassage(passages, current.row, current.col, next.nextRow, next.nextCol);
+      visited.add(cellKey(next.nextRow, next.nextCol));
+      stack.push({ row: next.nextRow, col: next.nextCol });
     }
-
-    route.push([row, col]);
   }
 
-  return route;
+  const route = findPathBetween({ row: 0, col: 0 }, { row: mapSize - 1, col: mapSize - 1 }, passages, mapSize);
+  return { route: route.map(({ row, col }) => [row, col]), passages };
+}
+
+function scoreMazeCandidate(candidate, mapSize) {
+  const routeCells = new Set(candidate.route.map(([row, col]) => cellKey(row, col)));
+  const offRouteGroups = findOffRouteGroups(candidate.passages, routeCells, mapSize);
+  const largestUnusedGroup = offRouteGroups.reduce((largest, groupSize) => Math.max(largest, groupSize), 0);
+  const unusedGroupPenalty = offRouteGroups.reduce((total, groupSize) => total + groupSize * groupSize, 0);
+
+  return candidate.route.length * 18 - largestUnusedGroup * 9 - unusedGroupPenalty;
+}
+
+function findOffRouteGroups(passages, routeCells, mapSize) {
+  const groups = [];
+  const visited = new Set(routeCells);
+
+  for (let row = 0; row < mapSize; row += 1) {
+    for (let col = 0; col < mapSize; col += 1) {
+      const key = cellKey(row, col);
+      if (visited.has(key)) continue;
+
+      let size = 0;
+      const stack = [{ row, col }];
+      visited.add(key);
+
+      while (stack.length) {
+        const current = stack.pop();
+        size += 1;
+
+        mazeDirections.forEach((direction) => {
+          const nextRow = current.row + direction.row;
+          const nextCol = current.col + direction.col;
+          const nextKey = cellKey(nextRow, nextCol);
+          if (
+            !isInMaze(nextRow, nextCol, mapSize) ||
+            visited.has(nextKey) ||
+            !hasPassageIn(passages, mapSize, current.row, current.col, direction)
+          ) {
+            return;
+          }
+
+          visited.add(nextKey);
+          stack.push({ row: nextRow, col: nextCol });
+        });
+      }
+
+      groups.push(size);
+    }
+  }
+
+  return groups;
+}
+
+function directionScore(direction) {
+  return { up: 1, right: 2, down: 3, left: 4 }[direction.key];
 }
 
 function revealAround(row, col) {
@@ -261,12 +325,34 @@ function cellKey(row, col) {
   return `${row},${col}`;
 }
 
+function passageKey(rowA, colA, rowB, colB) {
+  const first = cellKey(rowA, colA);
+  const second = cellKey(rowB, colB);
+  return first < second ? `${first}|${second}` : `${second}|${first}`;
+}
+
+function addPassage(passages, rowA, colA, rowB, colB) {
+  passages.add(passageKey(rowA, colA, rowB, colB));
+}
+
+function hasPassage(row, col, direction) {
+  const nextRow = row + direction.row;
+  const nextCol = col + direction.col;
+  return isInMaze(nextRow, nextCol) && mazePassages.has(passageKey(row, col, nextRow, nextCol));
+}
+
+function hasPassageIn(passages, mapSize, row, col, direction) {
+  const nextRow = row + direction.row;
+  const nextCol = col + direction.col;
+  return isInMaze(nextRow, nextCol, mapSize) && passages.has(passageKey(row, col, nextRow, nextCol));
+}
+
 function makeMazeMoveQuestion() {
   const index = playerPath.length - 1;
   const operators = mazeOperators.length ? mazeOperators : ["add"];
   const operator = operators[Math.floor(seededScore(index, mazeGrade, puzzleIndex) * operators.length)];
   const question = buildArithmeticQuestion(mazeGrade, operator, index + puzzleIndex * 13);
-  const correctDirection = getDirectionTowardGoal();
+  const correctDirection = getDirectionAlongRoute();
   const options = makeDirectionalOptions(question.answer, correctDirection, mazeGrade, index);
 
   return {
@@ -282,45 +368,67 @@ function getOperatorsForGrade(grade) {
 }
 
 function buildArithmeticQuestion(grade, operator, seed) {
+  const [leftRange, rightRange] = getMazeNumberRanges(grade);
+  const left = randomInt(leftRange.min, leftRange.max, seed, 1);
+  const right = randomInt(rightRange.min, rightRange.max, seed, 2);
+
   if (operator === "subtract") {
-    const max = grade <= 1 ? 20 : grade <= 3 ? 100 : 500;
-    const a = randomInt(6, max, seed, 1);
-    const b = randomInt(1, a, seed, 2);
+    const a = Math.max(left, right);
+    const b = Math.min(left, right);
     return { text: `${a} - ${b} = ?`, answer: a - b };
   }
 
   if (operator === "multiply") {
-    const maxA = grade <= 2 ? 5 : grade <= 3 ? 9 : grade <= 4 ? 12 : 20;
-    const maxB = grade <= 2 ? 5 : grade <= 3 ? 9 : grade <= 4 ? 12 : 15;
-    const a = randomInt(2, maxA, seed, 3);
-    const b = randomInt(2, maxB, seed, 4);
-    return { text: `${a} × ${b} = ?`, answer: a * b };
+    return { text: `${left} × ${right} = ?`, answer: left * right };
   }
 
   if (operator === "divide") {
-    const divisorMax = grade <= 3 ? 9 : grade <= 4 ? 12 : 15;
-    const quotientMax = grade <= 3 ? 9 : grade <= 4 ? 12 : 20;
-    const b = randomInt(2, divisorMax, seed, 5);
-    const answer = randomInt(2, quotientMax, seed, 6);
-    return { text: `${b * answer} ÷ ${b} = ?`, answer };
+    const divisor = Math.max(2, left);
+    return { text: `${divisor * right} ÷ ${divisor} = ?`, answer: right };
   }
 
-  const max = grade <= 1 ? 20 : grade <= 2 ? 100 : grade <= 4 ? 500 : 999;
-  const a = randomInt(1, max, seed, 7);
-  const b = randomInt(1, grade <= 1 ? 10 : max, seed, 8);
-  return { text: `${a} + ${b} = ?`, answer: a + b };
+  return { text: `${left} + ${right} = ?`, answer: left + right };
+}
+
+function getMazeNumberRanges(level) {
+  return {
+    1: [digitRange(1), digitRange(1)],
+    2: [digitRange(1), digitRange(2)],
+    3: [digitRange(2), digitRange(2)],
+    4: [digitRange(2), digitRange(3)],
+    5: [digitRange(3), digitRange(3)],
+    6: [digitRange(3), digitRange(4)],
+  }[level] || [digitRange(1), digitRange(1)];
+}
+
+function digitRange(digits) {
+  if (digits <= 1) return { min: 1, max: 9 };
+
+  return {
+    min: 10 ** (digits - 1),
+    max: 10 ** digits - 1,
+  };
 }
 
 function makeAnswerOptions(answer, grade, seed) {
   const options = new Set([answer]);
   const spread = grade <= 2 ? 5 : grade <= 4 ? 12 : 25;
+  const sameTailCandidate = answer + 10;
   let attempt = 0;
 
-  while (options.size < 4) {
+  if (sameTailCandidate >= 0) {
+    options.add(sameTailCandidate);
+  }
+
+  while (options.size < 4 && attempt < 60) {
     const offset = randomInt(-spread, spread, seed, attempt + 9);
     const candidate = answer + (offset === 0 ? attempt + 1 : offset);
     if (candidate >= 0) options.add(candidate);
     attempt += 1;
+  }
+
+  while (options.size < 4) {
+    options.add(answer + options.size * 10);
   }
 
   return [...options].sort((a, b) => seededScore(a, b, seed) - 0.5);
@@ -328,11 +436,28 @@ function makeAnswerOptions(answer, grade, seed) {
 
 function makeDirectionalOptions(answer, correctDirection, grade, seed) {
   const availableDirections = getOpenNeighborDirections();
-  if (!correctDirection) {
-    return [];
+  const answers = makeAnswerOptions(answer, grade, seed).filter((value) => value !== answer);
+  while (answers.length < availableDirections.length) {
+    const candidate = answer + (answers.length + 1) * 10;
+    if (!answers.includes(candidate)) answers.push(candidate);
   }
 
-  const answers = makeAnswerOptions(answer, grade, seed).filter((value) => value !== answer);
+  if (!correctDirection) {
+    return availableDirections.map((direction) => {
+      const row = mazePosition.row + direction.row;
+      const col = mazePosition.col + direction.col;
+      const hasVisited = playerPath.some((cell) => cell.row === row && cell.col === col);
+
+      return {
+        direction,
+        answer: hasVisited ? "返回" : "探索",
+        correct: false,
+        backtrack: hasVisited,
+        explore: !hasVisited,
+      };
+    });
+  }
+
   const wrongDirections = availableDirections
     .filter((direction) => direction.key !== correctDirection.key)
     .sort((a, b) => seededScore(seed, a.row + a.col, puzzleIndex) - seededScore(seed, b.row + b.col, puzzleIndex))
@@ -374,15 +499,11 @@ function renderMaze() {
         continue;
       }
 
-      if (!mazeOpenCells.has(key)) {
-        step.classList.add("wall");
-        step.textContent = "";
-      } else {
-        step.classList.add("path");
-        step.textContent = "";
-      }
+      addMazeWallClasses(step, row, col);
+      step.classList.add("path");
+      step.textContent = "";
 
-      if (staleIndex >= 0) {
+      if (staleIndex >= 0 && pathIndex < 0 && !isCurrent) {
         step.classList.add("stale");
         step.textContent = staleIndex;
       }
@@ -410,7 +531,7 @@ function renderMaze() {
   }
 
   mazeProgressEl.textContent = `第 ${playerPath.length} 步`;
-  if (isAtGoal()) {
+  if (hasSolvedMaze()) {
     mazeQuestionEl.textContent = "抵達終點";
     answerGridEl.innerHTML = "";
     return;
@@ -425,38 +546,93 @@ function renderMaze() {
     return;
   }
 
+  if (mazeCurrentQuestion.options.some((option) => option.backtrack || option.explore)) {
+    mazeQuestionEl.textContent = mazeCurrentQuestion.options.some((option) => option.explore)
+      ? "探索岔路"
+      : "回到走過的路";
+    mazeMessageEl.textContent = "沒有算術答案，依牆面選方向。";
+  }
+
   mazeCurrentQuestion.options.forEach((option) => {
     const button = document.createElement("button");
     button.className = "answer-button";
     button.type = "button";
-    button.innerHTML = `<span class="answer-direction">${option.direction.label}</span>${option.answer}`;
+    button.setAttribute(
+      "aria-label",
+      option.backtrack || option.explore ? `往${option.direction.name}${option.answer}` : `往${option.direction.name}，答案 ${option.answer}`
+    );
+    button.innerHTML = `<span class="answer-direction" aria-hidden="true">${option.direction.label}</span>${option.answer}`;
     button.addEventListener("click", () => answerMazeQuestion(option));
     answerGridEl.append(button);
   });
 }
 
+function addMazeWallClasses(step, row, col) {
+  if (row === 0) step.classList.add("wall-up");
+  if (col === 0) step.classList.add("wall-left");
+
+  const right = mazeDirections.find((direction) => direction.key === "right");
+  const down = mazeDirections.find((direction) => direction.key === "down");
+
+  if (!hasPassage(row, col, right)) step.classList.add("wall-right");
+  if (!hasPassage(row, col, down)) step.classList.add("wall-down");
+}
+
 function answerMazeQuestion(option) {
-  mazePosition = {
+  if (!hasPassage(mazePosition.row, mazePosition.col, option.direction)) {
+    mazeMessageEl.textContent = `往${option.direction.name}有牆，換個答案試試。`;
+    mazeMessageEl.classList.remove("win");
+    playFeedbackSound("think");
+    vibrate(10);
+    return;
+  }
+
+  const nextPosition = {
     row: mazePosition.row + option.direction.row,
     col: mazePosition.col + option.direction.col,
   };
+
+  const previousPathIndex = playerPath.findIndex(
+    (cell) => cell.row === nextPosition.row && cell.col === nextPosition.col
+  );
+  if (previousPathIndex >= 0) {
+    rewindMazeTo(previousPathIndex);
+    playFeedbackSound("move");
+    vibrate(12);
+    return;
+  }
+
+  mazePosition = nextPosition;
   playerPath.push({ ...mazePosition });
   revealAround(mazePosition.row, mazePosition.col);
   playFeedbackSound("move");
   vibrate(12);
 
-  if (isAtGoal()) {
+  if (hasSolvedMaze()) {
     mazeMessageEl.textContent = "走到終點了！重開迷宮繼續玩。";
     mazeMessageEl.classList.add("win");
     playFeedbackSound("win");
     celebrate();
   } else {
     mazeCurrentQuestion = makeMazeMoveQuestion();
-    mazeMessageEl.textContent = `往${option.direction.label}走了一步。`;
+    mazeMessageEl.textContent = `往${option.direction.name}走了一步。`;
     mazeMessageEl.classList.remove("win");
   }
 
   renderMaze();
+}
+
+function handleMazeKeyboard(event) {
+  if (activeApp !== "maze" || hasSolvedMaze() || !mazeCurrentQuestion) return;
+
+  const directionKey = mazeKeyDirections[event.key];
+  if (!directionKey) return;
+
+  const option = mazeCurrentQuestion.options.find((item) => item.direction.key === directionKey);
+  if (!option) return;
+
+  event.preventDefault();
+  answerMazeQuestion(option);
 }
 
 function rewindMazeTo(pathIndex) {
@@ -477,19 +653,27 @@ function rewindMazeTo(pathIndex) {
 
 function getOpenNeighborDirections() {
   return mazeDirections.filter((direction) => {
-    const row = mazePosition.row + direction.row;
-    const col = mazePosition.col + direction.col;
-    return isInMaze(row, col) && mazeOpenCells.has(cellKey(row, col));
+    return hasPassage(mazePosition.row, mazePosition.col, direction);
   });
 }
 
 function getDirectionTowardGoal() {
-  const path = findPathToGoal();
-  if (path.length < 2) {
+  return getDirectionAlongRoute();
+}
+
+function getDirectionAlongRoute() {
+  const routeIndex = playerPath.length - 1;
+  const routeCell = mazeRoute[routeIndex];
+  const nextRouteCell = mazeRoute[routeIndex + 1];
+  if (!routeCell || !nextRouteCell) {
     return null;
   }
 
-  const next = path[1];
+  if (!isOnCorrectRoutePrefix() || mazePosition.row !== routeCell[0] || mazePosition.col !== routeCell[1]) {
+    return null;
+  }
+
+  const next = { row: nextRouteCell[0], col: nextRouteCell[1] };
   return mazeDirections.find((direction) =>
     mazePosition.row + direction.row === next.row &&
     mazePosition.col + direction.col === next.col
@@ -497,8 +681,10 @@ function getDirectionTowardGoal() {
 }
 
 function findPathToGoal() {
-  const goal = { row: mazeSize - 1, col: mazeSize - 1 };
-  const start = { ...mazePosition };
+  return findPathBetween(mazePosition, { row: mazeSize - 1, col: mazeSize - 1 }, mazePassages, mazeSize);
+}
+
+function findPathBetween(start, goal, passages, mapSize) {
   const queue = [[start]];
   const visited = new Set([cellKey(start.row, start.col)]);
 
@@ -513,7 +699,7 @@ function findPathToGoal() {
       const row = current.row + direction.row;
       const col = current.col + direction.col;
       const key = cellKey(row, col);
-      if (!isInMaze(row, col) || !mazeOpenCells.has(key) || visited.has(key)) return;
+      if (!isInMaze(row, col, mapSize) || !hasPassageIn(passages, mapSize, current.row, current.col, direction) || visited.has(key)) return;
 
       visited.add(key);
       queue.push([...path, { row, col }]);
@@ -534,6 +720,17 @@ function getAbandonedStepIndex(row, col) {
 
 function isAtGoal() {
   return mazePosition.row === mazeSize - 1 && mazePosition.col === mazeSize - 1;
+}
+
+function hasSolvedMaze() {
+  return isAtGoal() && isOnCorrectRoutePrefix();
+}
+
+function isOnCorrectRoutePrefix() {
+  return playerPath.every((cell, index) => {
+    const routeCell = mazeRoute[index];
+    return routeCell && cell.row === routeCell[0] && cell.col === routeCell[1];
+  });
 }
 
 function getOperatorLabel(operator) {
@@ -590,16 +787,22 @@ function renderBoard() {
     }
   }
 
-  markSingleChoiceCells();
+  if (showSingleHints) {
+    markSingleChoiceCells();
+  } else {
+    updateHistoryButtons();
+  }
   renderMobileChoices();
 }
 
 function isBoxBoundaryRight(col) {
+  if (!hasBoxRule()) return false;
   const shape = boxShapes[size];
   return shape && col < size - 1 && (col + 1) % shape.cols === 0;
 }
 
 function isBoxBoundaryBottom(row) {
+  if (!hasBoxRule()) return false;
   const shape = boxShapes[size];
   return shape && row < size - 1 && (row + 1) % shape.rows === 0;
 }
@@ -612,18 +815,45 @@ function canUseSudoku(gridSize) {
   return Boolean(boxShapes[gridSize]);
 }
 
-function normalizeModeForSize() {
-  if (mode === "sudoku" && !canUseSudoku(size)) {
-    mode = "number";
-  }
+function getDefaultSudokuSize() {
+  return sudokuSizes[0];
 }
 
-function updateModeButtons() {
-  modeButtons.forEach((button) => {
-    const isSudokuButton = button.dataset.mode === "sudoku";
-    button.disabled = isSudokuButton && !canUseSudoku(size);
-    button.classList.toggle("active", button.dataset.mode === mode);
+function syncModeFromApp() {
+  if (activeApp === "sudoku" && canUseSudoku(size)) {
+    mode = "sudoku";
+    return;
+  }
+
+  if (activeApp === "sudoku") {
+    activeApp = "number";
+  }
+
+  mode = "number";
+}
+
+function updateAppButtons() {
+  appButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.app === activeApp);
   });
+  updateSizeButtons();
+}
+
+function updateSizeButtons() {
+  sizeButtons.forEach((button) => {
+    const buttonSize = Number(button.dataset.size);
+    const isAvailable = activeApp !== "sudoku" || canUseSudoku(buttonSize);
+    button.hidden = !isAvailable;
+    button.classList.toggle("active", buttonSize === size);
+  });
+}
+
+function getBoardGameName() {
+  return hasBoxRule() ? "數獨" : "數字方格";
+}
+
+function getBoardGameTitle() {
+  return hasBoxRule() ? "小小數獨" : "數字方格";
 }
 
 function selectCell(row, col) {
@@ -734,7 +964,7 @@ function getLegalChoices(row, col) {
   }
 
   const shape = boxShapes[size];
-  if (shape) {
+  if (hasBoxRule() && shape) {
     const boxRow = Math.floor(row / shape.rows) * shape.rows;
     const boxCol = Math.floor(col / shape.cols) * shape.cols;
     for (let r = boxRow; r < boxRow + shape.rows; r += 1) {
@@ -762,7 +992,7 @@ function fillCell(row, col, number) {
 
   board[row][col] = number;
   selected = null;
-  const isAnswer = number === solution[row][col];
+  const isAnswer = hasBoxRule() ? number === solution[row][col] : isCellValidByRules(row, col);
   triggerCellFeedback(row, col, isAnswer ? "good" : "think");
   playFeedbackSound(isAnswer ? "good" : "think");
   vibrate(isAnswer ? 18 : 10);
@@ -893,9 +1123,59 @@ function moveHistory(direction) {
 }
 
 function isComplete() {
-  return board.every((row, rowIndex) =>
-    row.every((value, colIndex) => value === solution[rowIndex][colIndex])
-  );
+  if (board.some((row) => row.some((value) => value === 0))) return false;
+
+  for (let index = 0; index < size; index += 1) {
+    const rowValues = board[index];
+    const colValues = board.map((row) => row[index]);
+    if (!hasAllNumbers(rowValues) || !hasAllNumbers(colValues)) return false;
+  }
+
+  if (hasBoxRule()) {
+    const shape = boxShapes[size];
+    for (let boxRow = 0; boxRow < size; boxRow += shape.rows) {
+      for (let boxCol = 0; boxCol < size; boxCol += shape.cols) {
+        const values = [];
+        for (let row = boxRow; row < boxRow + shape.rows; row += 1) {
+          for (let col = boxCol; col < boxCol + shape.cols; col += 1) {
+            values.push(board[row][col]);
+          }
+        }
+        if (!hasAllNumbers(values)) return false;
+      }
+    }
+  }
+
+  return true;
+}
+
+function hasAllNumbers(values) {
+  if (values.length !== size) return false;
+  const seen = new Set(values);
+  return seen.size === size && values.every((value) => value >= 1 && value <= size);
+}
+
+function isCellValidByRules(row, col) {
+  const value = board[row][col];
+  if (!value) return false;
+
+  for (let index = 0; index < size; index += 1) {
+    if (index !== col && board[row][index] === value) return false;
+    if (index !== row && board[index][col] === value) return false;
+  }
+
+  if (hasBoxRule()) {
+    const shape = boxShapes[size];
+    const boxRow = Math.floor(row / shape.rows) * shape.rows;
+    const boxCol = Math.floor(col / shape.cols) * shape.cols;
+    for (let r = boxRow; r < boxRow + shape.rows; r += 1) {
+      for (let c = boxCol; c < boxCol + shape.cols; c += 1) {
+        if ((r !== row || c !== col) && board[r][c] === value) return false;
+      }
+    }
+  }
+
+  return true;
 }
 
 function markSingleChoiceCells() {
@@ -924,19 +1204,8 @@ appTabs.addEventListener("click", (event) => {
 
 sizeButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    sizeButtons.forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
+    if (button.hidden) return;
     size = Number(button.dataset.size);
-    puzzleIndex = 0;
-    startGame();
-  });
-});
-
-modeButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    if (button.disabled) return;
-
-    mode = button.dataset.mode;
     puzzleIndex = 0;
     startGame();
   });
@@ -950,6 +1219,13 @@ difficultyButtons.forEach((button) => {
     puzzleIndex = 0;
     startGame();
   });
+});
+
+singleHintToggle.addEventListener("click", () => {
+  showSingleHints = !showSingleHints;
+  singleHintToggle.classList.toggle("active", showSingleHints);
+  singleHintToggle.setAttribute("aria-pressed", String(showSingleHints));
+  renderBoard();
 });
 
 gradeButtons.forEach((button) => {
@@ -992,16 +1268,6 @@ mazeSizeButtons.forEach((button) => {
   });
 });
 
-fogButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    fogButtons.forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    fogSize = Number(button.dataset.fogSize);
-    puzzleIndex = 0;
-    startGame();
-  });
-});
-
 newGameButton.addEventListener("click", () => {
   puzzleIndex += 1;
   startGame();
@@ -1009,6 +1275,7 @@ newGameButton.addEventListener("click", () => {
 
 undoButton.addEventListener("click", () => moveHistory(-1));
 redoButton.addEventListener("click", () => moveHistory(1));
+window.addEventListener("keydown", handleMazeKeyboard);
 mobileChoiceClose.addEventListener("click", () => {
   selected = null;
   renderBoard();

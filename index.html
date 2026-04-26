@@ -3,25 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>兒童數獨</title>
+    <title>小小益智遊戲</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23fbf8ef'/%3E%3Cpath d='M12 12h40v40H12z' fill='%23fffaf0' stroke='%2324312b' stroke-width='4'/%3E%3Cpath d='M12 25h40M12 38h40M25 12v40M38 12v40' stroke='%23d8d0be' stroke-width='2'/%3E%3Cpath d='M18 18h20v13H25v15h21' fill='none' stroke='%2316645a' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='18' cy='18' r='5' fill='%23f0b429'/%3E%3Ccircle cx='46' cy='46' r='5' fill='%23f6b5aa'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="game-shell">
-      <section class="game-panel" aria-labelledby="game-title">
-        <div class="topbar">
-          <div>
-            <p class="eyebrow" id="rule-label">4x4 Sudoku</p>
-            <h1 id="game-title">小小數獨</h1>
-          </div>
+      <section class="game-panel" aria-label="兒童益智遊戲">
+        <div class="app-tabs" role="group" aria-label="選擇遊戲">
+          <button class="pill-button active" type="button" data-app="sudoku">數獨</button>
+          <button class="pill-button" type="button" data-app="number">數字方格</button>
+          <button class="pill-button" type="button" data-app="maze">算術迷宮</button>
           <button class="icon-button" id="new-game" type="button" aria-label="換一題" title="換一題">
             ↻
           </button>
-        </div>
-
-        <div class="app-tabs" role="group" aria-label="選擇遊戲">
-          <button class="pill-button active" type="button" data-app="sudoku">數獨</button>
-          <button class="pill-button" type="button" data-app="maze">算術迷宮</button>
         </div>
 
         <div class="sudoku-game">
@@ -38,14 +33,6 @@
         </div>
 
         <div class="control-block">
-          <p class="control-label">玩法</p>
-          <div class="mode-picker" role="group" aria-label="選擇玩法">
-            <button class="pill-button active" type="button" data-mode="sudoku">Sudoku</button>
-            <button class="pill-button" type="button" data-mode="number">Number Grid</button>
-          </div>
-        </div>
-
-        <div class="control-block">
           <p class="control-label">難度</p>
           <div class="difficulty" role="group" aria-label="選擇難度">
             <button class="pill-button active" type="button" data-level="starter">入門</button>
@@ -53,6 +40,13 @@
             <button class="pill-button" type="button" data-level="hard">困難</button>
             <button class="pill-button" type="button" data-level="challenge">挑戰</button>
             <button class="pill-button" type="button" data-level="hell">地獄</button>
+          </div>
+        </div>
+
+        <div class="control-block">
+          <p class="control-label">提示</p>
+          <div class="hint-picker" role="group" aria-label="切換唯一解提示">
+            <button class="pill-button" id="single-hint-toggle" type="button" aria-pressed="false">唯一解提示</button>
           </div>
         </div>
 
@@ -70,14 +64,14 @@
 
         <div class="maze-game is-hidden">
           <div class="control-block">
-            <p class="control-label">年級</p>
-            <div class="grade-picker" role="group" aria-label="選擇年級">
-              <button class="pill-button active" type="button" data-grade="1">1</button>
-              <button class="pill-button" type="button" data-grade="2">2</button>
-              <button class="pill-button" type="button" data-grade="3">3</button>
-              <button class="pill-button" type="button" data-grade="4">4</button>
-              <button class="pill-button" type="button" data-grade="5">5</button>
-              <button class="pill-button" type="button" data-grade="6">6</button>
+            <p class="control-label">難度</p>
+            <div class="grade-picker" role="group" aria-label="選擇難度">
+              <button class="pill-button active" type="button" data-grade="1">Lv.1</button>
+              <button class="pill-button" type="button" data-grade="2">Lv.2</button>
+              <button class="pill-button" type="button" data-grade="3">Lv.3</button>
+              <button class="pill-button" type="button" data-grade="4">Lv.4</button>
+              <button class="pill-button" type="button" data-grade="5">Lv.5</button>
+              <button class="pill-button" type="button" data-grade="6">Lv.6</button>
             </div>
           </div>
 
@@ -85,29 +79,19 @@
             <p class="control-label">運算</p>
             <div class="operator-picker" role="group" aria-label="選擇運算">
               <button class="pill-button active" type="button" data-operator="add">加法</button>
-              <button class="pill-button active" type="button" data-operator="subtract">減法</button>
-              <button class="pill-button active" type="button" data-operator="multiply">乘法</button>
-              <button class="pill-button active" type="button" data-operator="divide">除法</button>
+              <button class="pill-button" type="button" data-operator="subtract">減法</button>
+              <button class="pill-button" type="button" data-operator="multiply">乘法</button>
+              <button class="pill-button" type="button" data-operator="divide">除法</button>
             </div>
           </div>
 
           <div class="control-block">
             <p class="control-label">地圖</p>
             <div class="maze-size-picker" role="group" aria-label="選擇地圖大小">
-              <button class="pill-button active" type="button" data-maze-size="5">5x5</button>
+              <button class="pill-button active" type="button" data-maze-size="7">7x7</button>
+              <button class="pill-button" type="button" data-maze-size="8">8x8</button>
+              <button class="pill-button" type="button" data-maze-size="9">9x9</button>
               <button class="pill-button" type="button" data-maze-size="10">10x10</button>
-              <button class="pill-button" type="button" data-maze-size="15">15x15</button>
-              <button class="pill-button" type="button" data-maze-size="20">20x20</button>
-              <button class="pill-button" type="button" data-maze-size="25">25x25</button>
-            </div>
-          </div>
-
-          <div class="control-block">
-            <p class="control-label">視野</p>
-            <div class="fog-picker" role="group" aria-label="選擇迷霧視野">
-              <button class="pill-button active" type="button" data-fog-size="2">2x2</button>
-              <button class="pill-button" type="button" data-fog-size="3">3x3</button>
-              <button class="pill-button" type="button" data-fog-size="4">4x4</button>
             </div>
           </div>
 

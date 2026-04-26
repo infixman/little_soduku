@@ -55,14 +55,6 @@ button {
   box-shadow: var(--shadow);
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.eyebrow,
 .control-label {
   margin: 0 0 6px;
   color: var(--muted);
@@ -113,18 +105,18 @@ h1 {
 
 .app-tabs,
 .size-picker,
-.mode-picker,
 .difficulty,
+.hint-picker,
 .grade-picker,
 .operator-picker,
-.maze-size-picker,
-.fog-picker {
+.maze-size-picker {
   display: grid;
   gap: 8px;
 }
 
 .app-tabs {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: center;
   margin-top: 22px;
 }
 
@@ -136,8 +128,8 @@ h1 {
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
-.mode-picker {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.hint-picker {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .grade-picker {
@@ -149,11 +141,7 @@ h1 {
 }
 
 .maze-size-picker {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-}
-
-.fog-picker {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .pill-button {
@@ -232,9 +220,9 @@ h1 {
   border: 1.5px solid var(--soft-line);
   background: #fffaf0;
   color: var(--player);
-  font-size: clamp(1.35rem, calc(22vw / var(--size)), 4rem);
+  font-size: clamp(1.15rem, calc(min(86vw, 430px) / var(--size)), 3.35rem);
   font-weight: 900;
-  line-height: 1;
+  line-height: 0.9;
   cursor: pointer;
   transition: background 150ms ease, transform 150ms ease;
 }
@@ -341,7 +329,10 @@ h1 {
   aspect-ratio: 1;
   display: grid;
   grid-template-columns: repeat(var(--maze-size), minmax(0, 1fr));
-  gap: clamp(1px, calc(10px / var(--maze-size)), 6px);
+  gap: 0;
+  padding: 2px;
+  background: var(--line);
+  border: 4px solid var(--line);
 }
 
 .maze-step {
@@ -350,18 +341,35 @@ h1 {
   aspect-ratio: 1;
   display: grid;
   place-items: center;
-  border: 2px solid var(--line);
-  border-radius: clamp(2px, calc(24px / var(--maze-size)), 8px);
+  border: 0 solid var(--line);
+  border-radius: 0;
   background: #fffaf0;
   color: var(--muted);
   font-size: clamp(0.45rem, calc(12vw / var(--maze-size)), 1rem);
   font-weight: 900;
 }
 
-.maze-step.wall {
-  border-color: #6c665c;
-  background: #6c665c;
-  color: #6c665c;
+.maze-step.wall-up,
+.maze-step.wall-right,
+.maze-step.wall-down,
+.maze-step.wall-left {
+  border-color: var(--line);
+}
+
+.maze-step.wall-up {
+  border-top-width: clamp(2px, calc(18px / var(--maze-size)), 5px);
+}
+
+.maze-step.wall-right {
+  border-right-width: clamp(2px, calc(18px / var(--maze-size)), 5px);
+}
+
+.maze-step.wall-down {
+  border-bottom-width: clamp(2px, calc(18px / var(--maze-size)), 5px);
+}
+
+.maze-step.wall-left {
+  border-left-width: clamp(2px, calc(18px / var(--maze-size)), 5px);
 }
 
 .maze-step.path {
@@ -386,14 +394,14 @@ h1 {
 }
 
 .maze-step.stale {
-  border-color: #a9a194;
   background: #c9c1b2;
   color: #6f675c;
 }
 
 .maze-step.fog {
-  border-color: #c7beaa;
   background:
+    linear-gradient(rgb(36 49 43 / 10%) 0 0) top / 100% 1px no-repeat,
+    linear-gradient(rgb(36 49 43 / 10%) 0 0) left / 1px 100% no-repeat,
     repeating-linear-gradient(135deg, rgb(36 49 43 / 15%) 0 5px, transparent 5px 10px),
     #ddd4c2;
   color: transparent;
@@ -444,8 +452,10 @@ h1 {
 .answer-direction {
   display: block;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 1.45rem;
   font-weight: 900;
+  line-height: 1;
+  margin-bottom: 4px;
 }
 
 .answer-button:active {
@@ -592,11 +602,6 @@ h1 {
     border-width: 2px;
   }
 
-  .topbar {
-    gap: 10px;
-  }
-
-  .eyebrow,
   .control-label {
     margin-bottom: 4px;
     font-size: 0.72rem;
@@ -627,14 +632,15 @@ h1 {
 
   .app-tabs,
   .size-picker,
-  .mode-picker,
   .difficulty,
+  .hint-picker,
   .grade-picker,
   .operator-picker {
     gap: 5px;
   }
 
   .app-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
     margin-top: 10px;
   }
 
@@ -657,7 +663,7 @@ h1 {
 
   .cell {
     border-width: 1px;
-    font-size: clamp(1.05rem, calc(18vw / var(--size)), 3rem);
+    font-size: clamp(0.95rem, calc(min(76vw, 330px) / var(--size)), 2.65rem);
   }
 
   .cell.box-right {
@@ -755,11 +761,7 @@ h1 {
   }
 
   .maze-size-picker {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-
-  .fog-picker {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .maze-wrap {
