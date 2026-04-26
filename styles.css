@@ -11,6 +11,9 @@
   --accent: #f0b429;
   --accent-strong: #db7d27;
   --mint: #bfe7cf;
+  --coral: #f6b5aa;
+  --sky: #a9d8f2;
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
   --shadow: 0 24px 60px rgb(47 38 17 / 16%);
 }
 
@@ -90,6 +93,14 @@ h1 {
 .icon-button:hover {
   background: var(--mint);
   transform: rotate(-14deg) scale(1.04);
+}
+
+.icon-button:active,
+.pill-button:active,
+.step-button:active,
+.choice:active,
+.mobile-close-button:active {
+  transform: scale(0.96);
 }
 
 .control-block {
@@ -212,6 +223,18 @@ h1 {
   z-index: 2;
 }
 
+.cell.feedback-good {
+  animation: cell-good 380ms var(--ease-out-quint);
+}
+
+.cell.feedback-think {
+  animation: cell-think 360ms var(--ease-out-quint);
+}
+
+.cell.feedback-clear {
+  animation: cell-clear 300ms var(--ease-out-quint);
+}
+
 .choices {
   position: absolute;
   inset: 5px;
@@ -239,6 +262,10 @@ h1 {
   background: var(--accent);
 }
 
+.choice {
+  transition: background 150ms ease, transform 120ms ease, box-shadow 150ms ease;
+}
+
 .single-choice {
   animation: pulse 900ms ease-in-out infinite alternate;
 }
@@ -254,10 +281,33 @@ h1 {
 
 .message.win {
   color: var(--accent-strong);
+  animation: message-pop 420ms var(--ease-out-quint);
 }
 
 .mobile-choice-panel {
   display: none;
+}
+
+.celebration {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.celebration-piece {
+  position: absolute;
+  top: 12%;
+  left: var(--x);
+  width: 10px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--color);
+  opacity: 0;
+  transform: translate3d(0, 0, 0) rotate(0deg);
+  animation: confetti-fall 900ms var(--ease-out-quint) forwards;
+  animation-delay: var(--delay);
 }
 
 @keyframes pulse {
@@ -267,6 +317,81 @@ h1 {
 
   to {
     box-shadow: inset 0 0 0 8px rgb(240 180 41 / 38%);
+  }
+}
+
+@keyframes cell-good {
+  0% {
+    background: #fffaf0;
+    transform: scale(1);
+  }
+
+  38% {
+    background: var(--mint);
+    transform: scale(1.08);
+    box-shadow: inset 0 0 0 7px rgb(22 100 90 / 18%);
+  }
+
+  100% {
+    background: #fffaf0;
+    transform: scale(1);
+  }
+}
+
+@keyframes cell-think {
+  0%,
+  100% {
+    transform: translateX(0);
+    background: #fffaf0;
+  }
+
+  25% {
+    transform: translateX(-4px);
+    background: #ffe2b8;
+  }
+
+  55% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes cell-clear {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.94);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes message-pop {
+  0% {
+    transform: translateY(4px) scale(0.98);
+    opacity: 0.6;
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -20px, 0) rotate(0deg);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift), 82vh, 0) rotate(var(--spin));
   }
 }
 
@@ -396,6 +521,7 @@ h1 {
     background: var(--panel);
     box-shadow: 0 -18px 44px rgb(47 38 17 / 20%);
     transform: translateY(0);
+    animation: sheet-in 220ms var(--ease-out-quint);
   }
 
   .mobile-choice-panel[hidden] {
@@ -436,5 +562,28 @@ h1 {
   .mobile-choice-grid .choice {
     min-height: 52px;
     font-size: 1.25rem;
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(28px);
+    opacity: 0.65;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

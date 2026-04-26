@@ -10,6 +10,7 @@ const mobileChoicePanel = document.querySelector("#mobile-choice-panel");
 const mobileChoiceTitle = document.querySelector("#mobile-choice-title");
 const mobileChoiceGrid = document.querySelector("#mobile-choice-grid");
 const mobileChoiceClose = document.querySelector("#mobile-choice-close");
+const celebrationEl = document.querySelector("#celebration");
 const mobileQuery = window.matchMedia("(max-width: 520px)");
 
 const levels = {
@@ -36,6 +37,9 @@ let fixed = [];
 let selected = null;
 let history = [];
 let historyIndex = 0;
+let feedbackCell = null;
+let feedbackTimer = null;
+let audioContext = null;
 
 function startGame() {
   solution = buildSolution(size, puzzleIndex);
@@ -143,6 +147,10 @@ function renderBoard() {
         showChoices(cell, row, col);
       }
 
+      if (feedbackCell?.row === row && feedbackCell?.col === col) {
+        cell.classList.add(`feedback-${feedbackCell.type}`);
+      }
+
       cell.addEventListener("click", () => selectCell(row, col));
       boardEl.append(cell);
     }
@@ -190,10 +198,7 @@ function showChoices(cell, row, col) {
     clear.setAttribute("aria-label", "清除這格");
     clear.addEventListener("click", (event) => {
       event.stopPropagation();
-      board[row][col] = 0;
-      selected = null;
-      messageEl.textContent = "清掉了，可以再想一次。";
-      saveStep();
+      clearCell(row, col);
     });
     box.append(clear);
   }
@@ -233,10 +238,7 @@ function renderMobileChoices() {
 
   if (board[row][col]) {
     mobileChoiceGrid.append(createMobileChoiceButton("清", "清除這格", () => {
-      board[row][col] = 0;
-      selected = null;
-      messageEl.textContent = "清掉了，可以再想一次。";
-      saveStep();
+      clearCell(row, col);
     }));
   }
 
@@ -308,18 +310,114 @@ function fillCell(row, col, number) {
 
   board[row][col] = number;
   selected = null;
+  const isAnswer = number === solution[row][col];
+  triggerCellFeedback(row, col, isAnswer ? "good" : "think");
+  playFeedbackSound(isAnswer ? "good" : "think");
+  vibrate(isAnswer ? 18 : 10);
 
   if (isComplete()) {
     messageEl.textContent = "完成了！換一題繼續玩。";
     messageEl.classList.add("win");
+    playFeedbackSound("win");
+    celebrate();
   } else {
-    messageEl.textContent = number === solution[row][col]
+    messageEl.textContent = isAnswer
       ? "很好，繼續找下一格。"
       : "這個數字可以放，但再想想答案對不對。";
-    messageEl.classList.toggle("win", number === solution[row][col]);
+    messageEl.classList.toggle("win", isAnswer);
   }
 
   saveStep();
+}
+
+function clearCell(row, col) {
+  board[row][col] = 0;
+  selected = null;
+  messageEl.textContent = "清掉了，可以再想一次。";
+  triggerCellFeedback(row, col, "clear");
+  playFeedbackSound("clear");
+  vibrate(8);
+  saveStep();
+}
+
+function triggerCellFeedback(row, col, type) {
+  feedbackCell = { row, col, type };
+  window.clearTimeout(feedbackTimer);
+  feedbackTimer = window.setTimeout(() => {
+    feedbackCell = null;
+    renderBoard();
+  }, 420);
+}
+
+function playFeedbackSound(type) {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return;
+
+  if (!audioContext) {
+    audioContext = new AudioContext();
+  }
+  if (audioContext.state === "suspended") {
+    audioContext.resume();
+  }
+
+  if (type === "win") {
+    playTone(523.25, 0.08, 0);
+    playTone(659.25, 0.08, 0.08);
+    playTone(783.99, 0.12, 0.16);
+    return;
+  }
+
+  const settings = {
+    good: { frequency: 659.25, duration: 0.07, gain: 0.045 },
+    think: { frequency: 246.94, duration: 0.08, gain: 0.035 },
+    clear: { frequency: 392, duration: 0.05, gain: 0.03 },
+  }[type];
+
+  if (settings) {
+    playTone(settings.frequency, settings.duration, 0, settings.gain);
+  }
+}
+
+function playTone(frequency, duration, delay = 0, gainValue = 0.045) {
+  const start = audioContext.currentTime + delay;
+  const oscillator = audioContext.createOscillator();
+  const gain = audioContext.createGain();
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(frequency, start);
+  gain.gain.setValueAtTime(0.0001, start);
+  gain.gain.exponentialRampToValueAtTime(gainValue, start + 0.012);
+  gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+  oscillator.connect(gain);
+  gain.connect(audioContext.destination);
+  oscillator.start(start);
+  oscillator.stop(start + duration + 0.02);
+}
+
+function vibrate(duration) {
+  if ("vibrate" in navigator) {
+    navigator.vibrate(duration);
+  }
+}
+
+function celebrate() {
+  const colors = ["var(--accent)", "var(--mint)", "var(--coral)", "var(--sky)", "var(--accent-strong)"];
+  celebrationEl.innerHTML = "";
+
+  for (let index = 0; index < 28; index += 1) {
+    const piece = document.createElement("span");
+    piece.className = "celebration-piece";
+    piece.style.setProperty("--x", `${8 + seededScore(index, 2, historyIndex) * 84}%`);
+    piece.style.setProperty("--drift", `${Math.round((seededScore(index, 3, historyIndex) - 0.5) * 140)}px`);
+    piece.style.setProperty("--spin", `${Math.round(180 + seededScore(index, 4, historyIndex) * 540)}deg`);
+    piece.style.setProperty("--delay", `${seededScore(index, 5, historyIndex) * 120}ms`);
+    piece.style.setProperty("--color", colors[index % colors.length]);
+    celebrationEl.append(piece);
+  }
+
+  window.setTimeout(() => {
+    celebrationEl.innerHTML = "";
+  }, 1200);
 }
 
 function saveStep() {
