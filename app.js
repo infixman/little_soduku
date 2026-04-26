@@ -6,6 +6,11 @@ const newGameButton = document.querySelector("#new-game");
 const undoButton = document.querySelector("#undo-step");
 const redoButton = document.querySelector("#redo-step");
 const ruleLabel = document.querySelector("#rule-label");
+const mobileChoicePanel = document.querySelector("#mobile-choice-panel");
+const mobileChoiceTitle = document.querySelector("#mobile-choice-title");
+const mobileChoiceGrid = document.querySelector("#mobile-choice-grid");
+const mobileChoiceClose = document.querySelector("#mobile-choice-close");
+const mobileQuery = window.matchMedia("(max-width: 520px)");
 
 const levels = {
   starter: 0.24,
@@ -144,6 +149,7 @@ function renderBoard() {
   }
 
   markSingleChoiceCells();
+  renderMobileChoices();
 }
 
 function isBoxBoundaryRight(col) {
@@ -170,6 +176,8 @@ function selectCell(row, col) {
 }
 
 function showChoices(cell, row, col) {
+  if (isMobileChoiceMode()) return;
+
   const choices = getLegalChoices(row, col);
   const box = document.createElement("div");
   box.className = "choices";
@@ -208,6 +216,57 @@ function showChoices(cell, row, col) {
   }
 
   cell.append(box);
+}
+
+function renderMobileChoices() {
+  if (!isMobileChoiceMode() || !selected) {
+    hideMobileChoices();
+    return;
+  }
+
+  const { row, col } = selected;
+  const choices = getLegalChoices(row, col);
+  mobileChoiceGrid.innerHTML = "";
+  mobileChoicePanel.hidden = false;
+  mobileChoiceTitle.textContent = `第 ${row + 1} 排，第 ${col + 1} 格`;
+
+  if (board[row][col]) {
+    mobileChoiceGrid.append(createMobileChoiceButton("清", "清除這格", () => {
+      board[row][col] = 0;
+      selected = null;
+      messageEl.textContent = "清掉了，可以再想一次。";
+      saveStep();
+    }));
+  }
+
+  choices.forEach((number) => {
+    mobileChoiceGrid.append(createMobileChoiceButton(number, `填入 ${number}`, () => {
+      fillCell(row, col, number);
+    }));
+  });
+
+  if (choices.length === 0 && !board[row][col]) {
+    messageEl.textContent = "這格暫時沒有可放的數字，先看別格。";
+  }
+}
+
+function createMobileChoiceButton(label, ariaLabel, onClick) {
+  const button = document.createElement("button");
+  button.className = "choice";
+  button.type = "button";
+  button.textContent = label;
+  button.setAttribute("aria-label", ariaLabel);
+  button.addEventListener("click", onClick);
+  return button;
+}
+
+function hideMobileChoices() {
+  mobileChoicePanel.hidden = true;
+  mobileChoiceGrid.innerHTML = "";
+}
+
+function isMobileChoiceMode() {
+  return mobileQuery.matches;
 }
 
 function getLegalChoices(row, col) {
@@ -330,5 +389,10 @@ newGameButton.addEventListener("click", () => {
 
 undoButton.addEventListener("click", () => moveHistory(-1));
 redoButton.addEventListener("click", () => moveHistory(1));
+mobileChoiceClose.addEventListener("click", () => {
+  selected = null;
+  renderBoard();
+});
+mobileQuery.addEventListener("change", renderBoard);
 
 startGame();
