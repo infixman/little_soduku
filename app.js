@@ -1,12 +1,23 @@
+const appButtons = document.querySelectorAll("[data-app]");
 const sizeButtons = document.querySelectorAll("[data-size]");
 const modeButtons = document.querySelectorAll("[data-mode]");
 const difficultyButtons = document.querySelectorAll("[data-level]");
+const gradeButtons = document.querySelectorAll("[data-grade]");
+const operatorButtons = document.querySelectorAll("[data-operator]");
 const boardEl = document.querySelector("#board");
 const messageEl = document.querySelector("#message");
 const newGameButton = document.querySelector("#new-game");
 const undoButton = document.querySelector("#undo-step");
 const redoButton = document.querySelector("#redo-step");
 const ruleLabel = document.querySelector("#rule-label");
+const gameTitle = document.querySelector("#game-title");
+const sudokuGame = document.querySelector(".sudoku-game");
+const mazeGame = document.querySelector(".maze-game");
+const mazePathEl = document.querySelector("#maze-path");
+const mazeProgressEl = document.querySelector("#maze-progress");
+const mazeQuestionEl = document.querySelector("#maze-question");
+const answerGridEl = document.querySelector("#answer-grid");
+const mazeMessageEl = document.querySelector("#maze-message");
 const mobileChoicePanel = document.querySelector("#mobile-choice-panel");
 const mobileChoiceTitle = document.querySelector("#mobile-choice-title");
 const mobileChoiceGrid = document.querySelector("#mobile-choice-grid");
@@ -32,6 +43,12 @@ const boxShapes = {
 let size = 4;
 let mode = "sudoku";
 let level = "starter";
+let activeApp = "sudoku";
+let mazeGrade = 1;
+let mazeOperator = "add";
+let mazeIndex = 0;
+let mazeQuestions = [];
+let mazeFeedback = null;
 let puzzleIndex = 0;
 let solution = [];
 let board = [];
@@ -44,6 +61,11 @@ let feedbackTimer = null;
 let audioContext = null;
 
 function startGame() {
+  if (activeApp === "maze") {
+    startMaze();
+    return;
+  }
+
   normalizeModeForSize();
   solution = buildSolution(size, puzzleIndex);
   board = hideCells(solution, levels[level], puzzleIndex);
@@ -56,6 +78,7 @@ function startGame() {
   boardEl.style.setProperty("--choice-cols", size <= 4 ? 2 : 3);
   boardEl.setAttribute("aria-label", `${size}x${size} 數獨棋盤`);
   ruleLabel.textContent = `${size}x${size} ${hasBoxRule() ? "Sudoku" : "Number Grid"}`;
+  gameTitle.textContent = "小小數獨";
   updateModeButtons();
 
   messageEl.textContent = hasBoxRule()
@@ -63,6 +86,20 @@ function startGame() {
     : "點空格，選一個同行、同列都沒出現的數字。";
   messageEl.classList.remove("win");
   renderBoard();
+}
+
+function switchApp(nextApp) {
+  activeApp = nextApp;
+  selected = null;
+  hideMobileChoices();
+  appButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.app === activeApp);
+  });
+  sudokuGame.hidden = activeApp !== "sudoku";
+  mazeGame.hidden = activeApp !== "maze";
+  newGameButton.setAttribute("aria-label", activeApp === "sudoku" ? "換一題" : "重開迷宮");
+  newGameButton.setAttribute("title", activeApp === "sudoku" ? "換一題" : "重開迷宮");
+  startGame();
 }
 
 function buildSolution(gridSize, offset) {
@@ -118,6 +155,156 @@ function hideCells(fullGrid, ratio, seed) {
 function seededScore(row, col, seed) {
   const value = Math.sin((row + 1) * 41.17 + (col + 1) * 73.31 + (seed + 1) * 19.89) * 10000;
   return value - Math.floor(value);
+}
+
+function startMaze() {
+  gameTitle.textContent = "算術迷宮";
+  ruleLabel.textContent = `${mazeGrade} 年級 ${getOperatorLabel(mazeOperator)}`;
+  mazeQuestions = Array.from({ length: 8 }, (_, index) => makeMazeQuestion(index));
+  mazeIndex = 0;
+  mazeFeedback = null;
+  mazeMessageEl.textContent = "答對就往前走一格。";
+  mazeMessageEl.classList.remove("win");
+  renderMaze();
+}
+
+function makeMazeQuestion(index) {
+  const operators = mazeOperator === "mixed"
+    ? getOperatorsForGrade(mazeGrade)
+    : [mazeOperator];
+  const operator = operators[Math.floor(seededScore(index, mazeGrade, puzzleIndex) * operators.length)];
+  const question = buildArithmeticQuestion(mazeGrade, operator, index + puzzleIndex * 13);
+  return {
+    ...question,
+    options: makeAnswerOptions(question.answer, mazeGrade, index),
+  };
+}
+
+function getOperatorsForGrade(grade) {
+  if (grade === 1) return ["add", "subtract"];
+  if (grade === 2) return ["add", "subtract", "multiply"];
+  return ["add", "subtract", "multiply", "divide"];
+}
+
+function buildArithmeticQuestion(grade, operator, seed) {
+  if (operator === "subtract") {
+    const max = grade <= 1 ? 20 : grade <= 3 ? 100 : 500;
+    const a = randomInt(6, max, seed, 1);
+    const b = randomInt(1, a, seed, 2);
+    return { text: `${a} - ${b} = ?`, answer: a - b };
+  }
+
+  if (operator === "multiply") {
+    const maxA = grade <= 2 ? 5 : grade <= 3 ? 9 : grade <= 4 ? 12 : 20;
+    const maxB = grade <= 2 ? 5 : grade <= 3 ? 9 : grade <= 4 ? 12 : 15;
+    const a = randomInt(2, maxA, seed, 3);
+    const b = randomInt(2, maxB, seed, 4);
+    return { text: `${a} × ${b} = ?`, answer: a * b };
+  }
+
+  if (operator === "divide") {
+    const divisorMax = grade <= 3 ? 9 : grade <= 4 ? 12 : 15;
+    const quotientMax = grade <= 3 ? 9 : grade <= 4 ? 12 : 20;
+    const b = randomInt(2, divisorMax, seed, 5);
+    const answer = randomInt(2, quotientMax, seed, 6);
+    return { text: `${b * answer} ÷ ${b} = ?`, answer };
+  }
+
+  const max = grade <= 1 ? 20 : grade <= 2 ? 100 : grade <= 4 ? 500 : 999;
+  const a = randomInt(1, max, seed, 7);
+  const b = randomInt(1, grade <= 1 ? 10 : max, seed, 8);
+  return { text: `${a} + ${b} = ?`, answer: a + b };
+}
+
+function makeAnswerOptions(answer, grade, seed) {
+  const options = new Set([answer]);
+  const spread = grade <= 2 ? 5 : grade <= 4 ? 12 : 25;
+  let attempt = 0;
+
+  while (options.size < 4) {
+    const offset = randomInt(-spread, spread, seed, attempt + 9);
+    const candidate = answer + (offset === 0 ? attempt + 1 : offset);
+    if (candidate >= 0) options.add(candidate);
+    attempt += 1;
+  }
+
+  return [...options].sort((a, b) => seededScore(a, b, seed) - 0.5);
+}
+
+function randomInt(min, max, seed, salt) {
+  return min + Math.floor(seededScore(seed, salt, puzzleIndex) * (max - min + 1));
+}
+
+function renderMaze() {
+  mazePathEl.innerHTML = "";
+  mazeQuestions.forEach((_, index) => {
+    const step = document.createElement("div");
+    step.className = "maze-step";
+    step.textContent = index === mazeQuestions.length - 1 ? "終點" : index + 1;
+    if (index < mazeIndex) step.classList.add("done");
+    if (index === mazeIndex) step.classList.add("current");
+    mazePathEl.append(step);
+  });
+
+  const current = mazeQuestions[Math.min(mazeIndex, mazeQuestions.length - 1)];
+  mazeProgressEl.textContent = `第 ${Math.min(mazeIndex + 1, mazeQuestions.length)} / ${mazeQuestions.length} 格`;
+  mazeQuestionEl.textContent = current.text;
+  answerGridEl.innerHTML = "";
+
+  current.options.forEach((answer) => {
+    const button = document.createElement("button");
+    button.className = "answer-button";
+    button.type = "button";
+    button.textContent = answer;
+    if (mazeFeedback?.answer === answer) {
+      button.classList.add(mazeFeedback.type);
+    }
+    button.addEventListener("click", () => answerMazeQuestion(answer));
+    answerGridEl.append(button);
+  });
+}
+
+function answerMazeQuestion(answer) {
+  const current = mazeQuestions[mazeIndex];
+  const correct = answer === current.answer;
+  mazeFeedback = { answer, type: correct ? "good" : "think" };
+  playFeedbackSound(correct ? "good" : "think");
+  vibrate(correct ? 18 : 10);
+
+  if (!correct) {
+    mazeMessageEl.textContent = "差一點，再選一次。";
+    mazeMessageEl.classList.remove("win");
+    renderMaze();
+    return;
+  }
+
+  mazeIndex += 1;
+  if (mazeIndex >= mazeQuestions.length) {
+    mazeIndex = mazeQuestions.length - 1;
+    mazeMessageEl.textContent = "走到終點了！重開迷宮繼續玩。";
+    mazeMessageEl.classList.add("win");
+    playFeedbackSound("win");
+    celebrate();
+  } else {
+    mazeMessageEl.textContent = "答對了，前進一格。";
+    mazeMessageEl.classList.add("win");
+  }
+
+  window.setTimeout(() => {
+    mazeFeedback = null;
+    renderMaze();
+  }, 220);
+  renderMaze();
+}
+
+function getOperatorLabel(operator) {
+  return {
+    add: "加法",
+    subtract: "減法",
+    multiply: "乘法",
+    divide: "除法",
+    mixed: "混合",
+  }[operator];
 }
 
 function renderBoard() {
@@ -484,6 +671,10 @@ function updateHistoryButtons() {
   redoButton.disabled = historyIndex >= history.length - 1;
 }
 
+appButtons.forEach((button) => {
+  button.addEventListener("click", () => switchApp(button.dataset.app));
+});
+
 sizeButtons.forEach((button) => {
   button.addEventListener("click", () => {
     sizeButtons.forEach((item) => item.classList.remove("active"));
@@ -509,6 +700,26 @@ difficultyButtons.forEach((button) => {
     difficultyButtons.forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
     level = button.dataset.level;
+    puzzleIndex = 0;
+    startGame();
+  });
+});
+
+gradeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    gradeButtons.forEach((item) => item.classList.remove("active"));
+    button.classList.add("active");
+    mazeGrade = Number(button.dataset.grade);
+    puzzleIndex = 0;
+    startGame();
+  });
+});
+
+operatorButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    operatorButtons.forEach((item) => item.classList.remove("active"));
+    button.classList.add("active");
+    mazeOperator = button.dataset.operator;
     puzzleIndex = 0;
     startGame();
   });

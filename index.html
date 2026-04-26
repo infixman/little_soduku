@@ -19,6 +19,12 @@
           </button>
         </div>
 
+        <div class="app-tabs" role="group" aria-label="選擇遊戲">
+          <button class="pill-button active" type="button" data-app="sudoku">數獨</button>
+          <button class="pill-button" type="button" data-app="maze">算術迷宮</button>
+        </div>
+
+        <div class="sudoku-game">
         <div class="control-block">
           <p class="control-label">尺寸</p>
           <div class="size-picker" id="size-picker" role="group" aria-label="選擇尺寸">
@@ -60,6 +66,44 @@
         </div>
 
         <p class="message" id="message" role="status" aria-live="polite">點空格，選一個可以放的數字。</p>
+        </div>
+
+        <div class="maze-game" hidden>
+          <div class="control-block">
+            <p class="control-label">年級</p>
+            <div class="grade-picker" role="group" aria-label="選擇年級">
+              <button class="pill-button active" type="button" data-grade="1">1</button>
+              <button class="pill-button" type="button" data-grade="2">2</button>
+              <button class="pill-button" type="button" data-grade="3">3</button>
+              <button class="pill-button" type="button" data-grade="4">4</button>
+              <button class="pill-button" type="button" data-grade="5">5</button>
+              <button class="pill-button" type="button" data-grade="6">6</button>
+            </div>
+          </div>
+
+          <div class="control-block">
+            <p class="control-label">運算</p>
+            <div class="operator-picker" role="group" aria-label="選擇運算">
+              <button class="pill-button active" type="button" data-operator="add">加法</button>
+              <button class="pill-button" type="button" data-operator="subtract">減法</button>
+              <button class="pill-button" type="button" data-operator="multiply">乘法</button>
+              <button class="pill-button" type="button" data-operator="divide">除法</button>
+              <button class="pill-button" type="button" data-operator="mixed">混合</button>
+            </div>
+          </div>
+
+          <div class="maze-wrap">
+            <div class="maze-path" id="maze-path" aria-label="算術迷宮路線"></div>
+          </div>
+
+          <section class="maze-card" aria-live="polite">
+            <p class="maze-progress" id="maze-progress">第 1 / 8 格</p>
+            <div class="maze-question" id="maze-question">3 + 4 = ?</div>
+            <div class="answer-grid" id="answer-grid"></div>
+          </section>
+
+          <p class="message maze-message" id="maze-message" role="status" aria-live="polite">答對就往前走一格。</p>
+        </div>
       </section>
     </main>
 
