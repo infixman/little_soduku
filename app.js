@@ -23,6 +23,7 @@ const mobileChoiceTitle = document.querySelector("#mobile-choice-title");
 const mobileChoiceGrid = document.querySelector("#mobile-choice-grid");
 const mobileChoiceClose = document.querySelector("#mobile-choice-close");
 const celebrationEl = document.querySelector("#celebration");
+const appTabs = document.querySelector(".app-tabs");
 const mobileQuery = window.matchMedia("(max-width: 520px)");
 
 const levels = {
@@ -95,8 +96,8 @@ function switchApp(nextApp) {
   appButtons.forEach((button) => {
     button.classList.toggle("active", button.dataset.app === activeApp);
   });
-  sudokuGame.hidden = activeApp !== "sudoku";
-  mazeGame.hidden = activeApp !== "maze";
+  sudokuGame.classList.toggle("is-hidden", activeApp !== "sudoku");
+  mazeGame.classList.toggle("is-hidden", activeApp !== "maze");
   newGameButton.setAttribute("aria-label", activeApp === "sudoku" ? "換一題" : "重開迷宮");
   newGameButton.setAttribute("title", activeApp === "sudoku" ? "換一題" : "重開迷宮");
   startGame();
@@ -671,8 +672,11 @@ function updateHistoryButtons() {
   redoButton.disabled = historyIndex >= history.length - 1;
 }
 
-appButtons.forEach((button) => {
-  button.addEventListener("click", () => switchApp(button.dataset.app));
+appTabs.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-app]");
+  if (!button) return;
+
+  switchApp(button.dataset.app);
 });
 
 sizeButtons.forEach((button) => {

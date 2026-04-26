@@ -39,6 +39,10 @@ button {
   font: inherit;
 }
 
+.is-hidden {
+  display: none !important;
+}
+
 .game-shell {
   width: min(100%, 620px);
 }
