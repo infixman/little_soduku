@@ -325,12 +325,12 @@ h1 {
 
 .maze-path {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .maze-step {
-  min-height: 62px;
+  min-height: 58px;
   display: grid;
   place-items: center;
   border: 2px solid var(--line);
@@ -340,15 +340,30 @@ h1 {
   font-weight: 900;
 }
 
-.maze-step.done {
+.maze-step.wall {
+  border-color: #6c665c;
+  background: #6c665c;
+  color: #6c665c;
+}
+
+.maze-step.path {
+  background: #fffaf0;
+}
+
+.maze-step.visited {
   background: var(--mint);
   color: var(--ink);
 }
 
-.maze-step.current {
+.maze-step.player {
   background: var(--accent);
   color: var(--ink);
   animation: message-pop 420ms var(--ease-out-quint);
+}
+
+.maze-step.goal {
+  background: var(--coral);
+  color: var(--ink);
 }
 
 .maze-card {
@@ -391,6 +406,13 @@ h1 {
   font-weight: 900;
   cursor: pointer;
   transition: background 150ms ease, transform 120ms ease;
+}
+
+.answer-direction {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
 }
 
 .answer-button:active {
@@ -704,12 +726,12 @@ h1 {
   }
 
   .maze-path {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 5px;
   }
 
   .maze-step {
-    min-height: 42px;
+    min-height: 38px;
     border-radius: 7px;
     font-size: 0.9rem;
   }
