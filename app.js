@@ -1,4 +1,5 @@
 const sizeButtons = document.querySelectorAll("[data-size]");
+const modeButtons = document.querySelectorAll("[data-mode]");
 const difficultyButtons = document.querySelectorAll("[data-level]");
 const boardEl = document.querySelector("#board");
 const messageEl = document.querySelector("#message");
@@ -29,6 +30,7 @@ const boxShapes = {
 };
 
 let size = 4;
+let mode = "sudoku";
 let level = "starter";
 let puzzleIndex = 0;
 let solution = [];
@@ -42,6 +44,7 @@ let feedbackTimer = null;
 let audioContext = null;
 
 function startGame() {
+  normalizeModeForSize();
   solution = buildSolution(size, puzzleIndex);
   board = hideCells(solution, levels[level], puzzleIndex);
   fixed = board.map((row) => row.map((value) => value !== 0));
@@ -53,6 +56,7 @@ function startGame() {
   boardEl.style.setProperty("--choice-cols", size <= 4 ? 2 : 3);
   boardEl.setAttribute("aria-label", `${size}x${size} 數獨棋盤`);
   ruleLabel.textContent = `${size}x${size} ${hasBoxRule() ? "Sudoku" : "Number Grid"}`;
+  updateModeButtons();
 
   messageEl.textContent = hasBoxRule()
     ? "點空格，選一個同行、同列、同宮都沒出現的數字。"
@@ -62,7 +66,7 @@ function startGame() {
 }
 
 function buildSolution(gridSize, offset) {
-  if (boxShapes[gridSize]) {
+  if (mode === "sudoku" && canUseSudoku(gridSize)) {
     return buildSudokuSolution(gridSize, offset);
   }
 
@@ -171,7 +175,25 @@ function isBoxBoundaryBottom(row) {
 }
 
 function hasBoxRule() {
-  return Boolean(boxShapes[size]);
+  return mode === "sudoku" && canUseSudoku(size);
+}
+
+function canUseSudoku(gridSize) {
+  return Boolean(boxShapes[gridSize]);
+}
+
+function normalizeModeForSize() {
+  if (mode === "sudoku" && !canUseSudoku(size)) {
+    mode = "number";
+  }
+}
+
+function updateModeButtons() {
+  modeButtons.forEach((button) => {
+    const isSudokuButton = button.dataset.mode === "sudoku";
+    button.disabled = isSudokuButton && !canUseSudoku(size);
+    button.classList.toggle("active", button.dataset.mode === mode);
+  });
 }
 
 function selectCell(row, col) {
@@ -467,6 +489,16 @@ sizeButtons.forEach((button) => {
     sizeButtons.forEach((item) => item.classList.remove("active"));
     button.classList.add("active");
     size = Number(button.dataset.size);
+    puzzleIndex = 0;
+    startGame();
+  });
+});
+
+modeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    if (button.disabled) return;
+
+    mode = button.dataset.mode;
     puzzleIndex = 0;
     startGame();
   });

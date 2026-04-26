@@ -9,6 +9,7 @@ https://infixman.github.io/little_soduku/
 ## 功能
 
 - 支援 4x4 到 9x9
+- 支援 Sudoku 與 Number Grid 玩法
 - 支援入門、簡單、困難、挑戰、地獄五種難度
 - 點空格後只顯示目前合理的數字
 - 支援上一步、下一步
