@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>兒童數獨</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="game-shell">
+      <section class="game-panel" aria-labelledby="game-title">
+        <div class="topbar">
+          <div>
+            <p class="eyebrow" id="rule-label">4x4 Sudoku</p>
+            <h1 id="game-title">小小數獨</h1>
+          </div>
+          <button class="icon-button" id="new-game" type="button" aria-label="換一題" title="換一題">
+            ↻
+          </button>
+        </div>
+
+        <div class="control-block">
+          <p class="control-label">尺寸</p>
+          <div class="size-picker" id="size-picker" role="group" aria-label="選擇尺寸">
+            <button class="pill-button active" type="button" data-size="4">4x4</button>
+            <button class="pill-button" type="button" data-size="5">5x5</button>
+            <button class="pill-button" type="button" data-size="6">6x6</button>
+            <button class="pill-button" type="button" data-size="7">7x7</button>
+            <button class="pill-button" type="button" data-size="8">8x8</button>
+            <button class="pill-button" type="button" data-size="9">9x9</button>
+          </div>
+        </div>
+
+        <div class="control-block">
+          <p class="control-label">難度</p>
+          <div class="difficulty" role="group" aria-label="選擇難度">
+            <button class="pill-button active" type="button" data-level="starter">入門</button>
+            <button class="pill-button" type="button" data-level="easy">簡單</button>
+            <button class="pill-button" type="button" data-level="hard">困難</button>
+            <button class="pill-button" type="button" data-level="challenge">挑戰</button>
+            <button class="pill-button" type="button" data-level="hell">地獄</button>
+          </div>
+        </div>
+
+        <div class="board-wrap">
+          <div class="board" id="board" aria-label="數獨棋盤"></div>
+        </div>
+
+        <div class="history-controls" aria-label="步驟控制">
+          <button class="step-button" id="undo-step" type="button">上一步</button>
+          <button class="step-button" id="redo-step" type="button">下一步</button>
+        </div>
+
+        <p class="message" id="message" role="status" aria-live="polite">點空格，選一個可以放的數字。</p>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
