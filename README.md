@@ -2,6 +2,10 @@
 
 給小朋友玩的純前端數獨遊戲，可以直接用 GitHub Pages 發佈。
 
+## 線上遊玩
+
+https://infixman.github.io/little_soduku/
+
 ## 功能
 
 - 支援 4x4 到 9x9
@@ -16,15 +20,9 @@
 
 ## 發佈到 GitHub Pages
 
-1. 在 GitHub 建立一個新的 repository，例如 `kids-sudoku`。
-2. 把這個資料夾推上去。
+1. 在 GitHub 建立 repository：`infixman/little_soduku`。
+2. 把這個資料夾推上 `main` 分支。
 3. 到 repository 的 `Settings` -> `Pages`。
 4. `Build and deployment` 選擇 `Deploy from a branch`。
-5. Branch 選 `main`，資料夾選 `/root`。
+5. Branch 選 `main`，資料夾選 `/ (root)`。
 6. 儲存後等待 GitHub 產生網址。
-
-GitHub Pages 網址通常會長這樣：
-
-```text
-https://你的帳號.github.io/kids-sudoku/
-```
