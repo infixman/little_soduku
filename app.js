@@ -228,6 +228,7 @@ function renderMobileChoices() {
   const choices = getLegalChoices(row, col);
   mobileChoiceGrid.innerHTML = "";
   mobileChoicePanel.hidden = false;
+  document.body.classList.add("choice-panel-open");
   mobileChoiceTitle.textContent = `第 ${row + 1} 排，第 ${col + 1} 格`;
 
   if (board[row][col]) {
@@ -263,6 +264,7 @@ function createMobileChoiceButton(label, ariaLabel, onClick) {
 function hideMobileChoices() {
   mobileChoicePanel.hidden = true;
   mobileChoiceGrid.innerHTML = "";
+  document.body.classList.remove("choice-panel-open");
 }
 
 function isMobileChoiceMode() {

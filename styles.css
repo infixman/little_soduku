@@ -273,19 +273,105 @@ h1 {
 @media (max-width: 520px) {
   body {
     align-items: start;
-    padding: 12px 12px calc(132px + env(safe-area-inset-bottom));
+    min-height: 100svh;
+    padding: 8px;
+  }
+
+  body.choice-panel-open {
+    padding-bottom: calc(112px + env(safe-area-inset-bottom));
   }
 
   .game-panel {
-    padding: 14px;
+    min-height: calc(100svh - 16px);
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    border-width: 2px;
+  }
+
+  .topbar {
+    gap: 10px;
+  }
+
+  .eyebrow,
+  .control-label {
+    margin-bottom: 4px;
+    font-size: 0.72rem;
+  }
+
+  h1 {
+    font-size: clamp(1.8rem, 9vw, 2.7rem);
+  }
+
+  .icon-button {
+    width: 42px;
+    height: 42px;
+    border-width: 2px;
+    font-size: 1.3rem;
+  }
+
+  .control-block {
+    margin-top: 10px;
   }
 
   .size-picker {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .difficulty {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .size-picker,
+  .difficulty {
+    gap: 5px;
+  }
+
+  .pill-button {
+    min-height: 32px;
+    border-width: 2px;
+    border-radius: 999px;
+    font-size: clamp(0.78rem, 3.4vw, 0.96rem);
+    line-height: 1;
+  }
+
+  .board-wrap {
+    margin-top: 12px;
+  }
+
+  .board {
+    width: min(100%, 48svh, 430px);
+    border-width: 3px;
+  }
+
+  .cell {
+    border-width: 1px;
+    font-size: clamp(1.05rem, calc(18vw / var(--size)), 3rem);
+  }
+
+  .cell.box-right {
+    border-right-width: 3px;
+  }
+
+  .cell.box-bottom {
+    border-bottom-width: 3px;
+  }
+
+  .history-controls {
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .step-button {
+    min-height: 40px;
+    border-radius: 7px;
+    font-size: 0.95rem;
+  }
+
+  .message {
+    min-height: 1.25em;
+    margin-top: 8px;
+    font-size: 0.95rem;
   }
 
   .choices {
