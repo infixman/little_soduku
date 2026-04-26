@@ -400,8 +400,6 @@ h1 {
 
 .maze-step.fog {
   background:
-    linear-gradient(rgb(36 49 43 / 10%) 0 0) top / 100% 1px no-repeat,
-    linear-gradient(rgb(36 49 43 / 10%) 0 0) left / 1px 100% no-repeat,
     repeating-linear-gradient(135deg, rgb(36 49 43 / 15%) 0 5px, transparent 5px 10px),
     #ddd4c2;
   color: transparent;
