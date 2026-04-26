@@ -116,7 +116,9 @@ h1 {
 .mode-picker,
 .difficulty,
 .grade-picker,
-.operator-picker {
+.operator-picker,
+.maze-size-picker,
+.fog-picker {
   display: grid;
   gap: 8px;
 }
@@ -144,6 +146,14 @@ h1 {
 
 .operator-picker {
   grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.maze-size-picker {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.fog-picker {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .pill-button {
@@ -320,23 +330,31 @@ h1 {
 }
 
 .maze-wrap {
+  display: grid;
+  place-items: center;
   margin-top: 24px;
 }
 
 .maze-path {
+  --maze-size: 5;
+  width: min(100%, 500px);
+  aspect-ratio: 1;
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 6px;
+  grid-template-columns: repeat(var(--maze-size), minmax(0, 1fr));
+  gap: clamp(1px, calc(10px / var(--maze-size)), 6px);
 }
 
 .maze-step {
-  min-height: 58px;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
   border: 2px solid var(--line);
-  border-radius: 8px;
+  border-radius: clamp(2px, calc(24px / var(--maze-size)), 8px);
   background: #fffaf0;
   color: var(--muted);
+  font-size: clamp(0.45rem, calc(12vw / var(--maze-size)), 1rem);
   font-weight: 900;
 }
 
@@ -364,6 +382,14 @@ h1 {
 .maze-step.goal {
   background: var(--coral);
   color: var(--ink);
+}
+
+.maze-step.fog {
+  border-color: #c7beaa;
+  background:
+    repeating-linear-gradient(135deg, rgb(36 49 43 / 15%) 0 5px, transparent 5px 10px),
+    #ddd4c2;
+  color: transparent;
 }
 
 .maze-card {
@@ -721,19 +747,24 @@ h1 {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
+  .maze-size-picker {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .fog-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .maze-wrap {
     margin-top: 10px;
   }
 
   .maze-path {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 5px;
+    width: min(100%, 42svh, 430px);
   }
 
   .maze-step {
-    min-height: 38px;
-    border-radius: 7px;
-    font-size: 0.9rem;
+    border-width: 1px;
   }
 
   .maze-card {
