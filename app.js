@@ -478,58 +478,146 @@ function randomInt(min, max, seed, salt) {
 }
 
 function renderMaze() {
-  mazePathEl.innerHTML = "";
   mazePathEl.style.setProperty("--maze-size", mazeSize);
+  drawMazeCanvas();
+
+  renderMazeQuestion();
+}
+
+function drawMazeCanvas() {
+  const displaySize = Math.max(1, Math.round(mazePathEl.clientWidth || 500));
+  const dpr = window.devicePixelRatio || 1;
+  if (mazePathEl.width !== Math.round(displaySize * dpr)) {
+    mazePathEl.width = Math.round(displaySize * dpr);
+    mazePathEl.height = Math.round(displaySize * dpr);
+  }
+
+  const ctx = mazePathEl.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, displaySize, displaySize);
+
+  const cellSize = displaySize / mazeSize;
+  const wallWidth = Math.min(5, Math.max(2, 18 / mazeSize));
   const currentPathIndex = playerPath.length - 1;
 
   for (let row = 0; row < mazeSize; row += 1) {
     for (let col = 0; col < mazeSize; col += 1) {
-      const step = document.createElement("div");
-      step.className = "maze-step";
       const key = cellKey(row, col);
       const pathIndex = playerPath.findIndex((cell) => cell.row === row && cell.col === col);
       const staleIndex = getAbandonedStepIndex(row, col);
       const isCurrent = row === mazePosition.row && col === mazePosition.col;
       const isGoal = row === mazeSize - 1 && col === mazeSize - 1;
       const isSeen = mazeSeenCells.has(key) || isCurrent || pathIndex >= 0 || staleIndex >= 0;
+      const x = col * cellSize;
+      const y = row * cellSize;
 
       if (!isSeen) {
-        step.classList.add("fog");
-        mazePathEl.append(step);
+        drawMazeFogCell(ctx, x, y, cellSize);
         continue;
       }
 
-      addMazeWallClasses(step, row, col);
-      step.classList.add("path");
-      step.textContent = "";
+      let fill = "#fffaf0";
+      let text = "";
+      let textColor = "#65746c";
 
       if (staleIndex >= 0 && pathIndex < 0 && !isCurrent) {
-        step.classList.add("stale");
-        step.textContent = staleIndex;
+        fill = "#c9c1b2";
+        text = staleIndex;
+        textColor = "#6f675c";
       }
 
       if (pathIndex >= 0 && pathIndex < currentPathIndex) {
-        step.classList.add("visited");
-        step.textContent = pathIndex === 0 ? "起" : pathIndex;
-        step.addEventListener("click", () => rewindMazeTo(pathIndex));
+        fill = "#bfe7cf";
+        text = pathIndex === 0 ? "起" : pathIndex;
+        textColor = "#24312b";
       }
 
       if (isCurrent) {
-        step.classList.add("player");
-        step.textContent = "我";
+        fill = "#f0b429";
+        text = "我";
+        textColor = "#24312b";
       }
 
       if (isGoal) {
-        step.classList.add("goal");
+        fill = "#f6b5aa";
+        textColor = "#24312b";
         if (!isCurrent) {
-          step.textContent = "終";
+          text = "終";
         }
       }
 
-      mazePathEl.append(step);
+      ctx.fillStyle = fill;
+      ctx.fillRect(x, y, cellSize, cellSize);
+      if (text !== "") {
+        drawMazeText(ctx, String(text), x + cellSize / 2, y + cellSize / 2, cellSize, textColor);
+      }
     }
   }
 
+  drawMazeWalls(ctx, cellSize, wallWidth);
+}
+
+function drawMazeFogCell(ctx, x, y, cellSize) {
+  ctx.fillStyle = "#ddd4c2";
+  ctx.fillRect(x, y, cellSize, cellSize);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, cellSize, cellSize);
+  ctx.clip();
+  ctx.strokeStyle = "rgb(36 49 43 / 15%)";
+  ctx.lineWidth = 3;
+  for (let offset = -cellSize; offset <= cellSize * 2; offset += 10) {
+    ctx.beginPath();
+    ctx.moveTo(x + offset, y + cellSize);
+    ctx.lineTo(x + offset + cellSize, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawMazeText(ctx, text, x, y, cellSize, color) {
+  ctx.fillStyle = color;
+  ctx.font = `900 ${Math.max(10, Math.min(24, cellSize * 0.28))}px "Segoe UI", "Noto Sans TC", sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, x, y);
+}
+
+function drawMazeWalls(ctx, cellSize, wallWidth) {
+  ctx.strokeStyle = "#24312b";
+  ctx.lineWidth = wallWidth;
+  ctx.lineCap = "butt";
+
+  for (let row = 0; row < mazeSize; row += 1) {
+    for (let col = 0; col < mazeSize; col += 1) {
+      const key = cellKey(row, col);
+      const pathIndex = playerPath.findIndex((cell) => cell.row === row && cell.col === col);
+      const staleIndex = getAbandonedStepIndex(row, col);
+      const isCurrent = row === mazePosition.row && col === mazePosition.col;
+      const isSeen = mazeSeenCells.has(key) || isCurrent || pathIndex >= 0 || staleIndex >= 0;
+      if (!isSeen) continue;
+
+      const x = col * cellSize;
+      const y = row * cellSize;
+      const right = mazeDirections.find((direction) => direction.key === "right");
+      const down = mazeDirections.find((direction) => direction.key === "down");
+
+      if (row === 0) drawMazeLine(ctx, x, y, x + cellSize, y);
+      if (col === 0) drawMazeLine(ctx, x, y, x, y + cellSize);
+      if (!hasPassage(row, col, right)) drawMazeLine(ctx, x + cellSize, y, x + cellSize, y + cellSize);
+      if (!hasPassage(row, col, down)) drawMazeLine(ctx, x, y + cellSize, x + cellSize, y + cellSize);
+    }
+  }
+}
+
+function drawMazeLine(ctx, x1, y1, x2, y2) {
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+function renderMazeQuestion() {
   mazeProgressEl.textContent = `第 ${playerPath.length} 步`;
   if (hasSolvedMaze()) {
     mazeQuestionEl.textContent = "抵達終點";
@@ -567,15 +655,31 @@ function renderMaze() {
   });
 }
 
-function addMazeWallClasses(step, row, col) {
-  if (row === 0) step.classList.add("wall-up");
-  if (col === 0) step.classList.add("wall-left");
+function handleMazeCanvasClick(event) {
+  if (activeApp !== "maze") return;
 
-  const right = mazeDirections.find((direction) => direction.key === "right");
-  const down = mazeDirections.find((direction) => direction.key === "down");
+  const rect = mazePathEl.getBoundingClientRect();
+  const styles = window.getComputedStyle(mazePathEl);
+  const borderLeft = parseFloat(styles.borderLeftWidth) || 0;
+  const borderTop = parseFloat(styles.borderTopWidth) || 0;
+  const x = event.clientX - rect.left - borderLeft;
+  const y = event.clientY - rect.top - borderTop;
+  const displaySize = mazePathEl.clientWidth;
+  if (x < 0 || y < 0 || x > displaySize || y > displaySize) return;
 
-  if (!hasPassage(row, col, right)) step.classList.add("wall-right");
-  if (!hasPassage(row, col, down)) step.classList.add("wall-down");
+  const col = Math.min(mazeSize - 1, Math.floor((x / displaySize) * mazeSize));
+  const row = Math.min(mazeSize - 1, Math.floor((y / displaySize) * mazeSize));
+  const currentPathIndex = playerPath.length - 1;
+  const pathIndex = playerPath.findIndex((cell) => cell.row === row && cell.col === col);
+  if (pathIndex >= 0 && pathIndex < currentPathIndex) {
+    rewindMazeTo(pathIndex);
+  }
+}
+
+function redrawMazeOnResize() {
+  if (activeApp === "maze") {
+    drawMazeCanvas();
+  }
 }
 
 function answerMazeQuestion(option) {
@@ -1276,6 +1380,8 @@ newGameButton.addEventListener("click", () => {
 undoButton.addEventListener("click", () => moveHistory(-1));
 redoButton.addEventListener("click", () => moveHistory(1));
 window.addEventListener("keydown", handleMazeKeyboard);
+window.addEventListener("resize", redrawMazeOnResize);
+mazePathEl.addEventListener("click", handleMazeCanvasClick);
 mobileChoiceClose.addEventListener("click", () => {
   selected = null;
   renderBoard();

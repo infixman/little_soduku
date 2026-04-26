@@ -327,82 +327,9 @@ h1 {
   --maze-size: 5;
   width: min(100%, 500px);
   aspect-ratio: 1;
-  display: grid;
-  grid-template-columns: repeat(var(--maze-size), minmax(0, 1fr));
-  gap: 0;
-  padding: 2px;
-  background: var(--line);
+  display: block;
+  background: #fffaf0;
   border: 4px solid var(--line);
-}
-
-.maze-step {
-  min-width: 0;
-  min-height: 0;
-  aspect-ratio: 1;
-  display: grid;
-  place-items: center;
-  border: 0 solid var(--line);
-  border-radius: 0;
-  background: #fffaf0;
-  color: var(--muted);
-  font-size: clamp(0.45rem, calc(12vw / var(--maze-size)), 1rem);
-  font-weight: 900;
-}
-
-.maze-step.wall-up,
-.maze-step.wall-right,
-.maze-step.wall-down,
-.maze-step.wall-left {
-  border-color: var(--line);
-}
-
-.maze-step.wall-up {
-  border-top-width: clamp(2px, calc(18px / var(--maze-size)), 5px);
-}
-
-.maze-step.wall-right {
-  border-right-width: clamp(2px, calc(18px / var(--maze-size)), 5px);
-}
-
-.maze-step.wall-down {
-  border-bottom-width: clamp(2px, calc(18px / var(--maze-size)), 5px);
-}
-
-.maze-step.wall-left {
-  border-left-width: clamp(2px, calc(18px / var(--maze-size)), 5px);
-}
-
-.maze-step.path {
-  background: #fffaf0;
-}
-
-.maze-step.visited {
-  background: var(--mint);
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.maze-step.player {
-  background: var(--accent);
-  color: var(--ink);
-  animation: message-pop 420ms var(--ease-out-quint);
-}
-
-.maze-step.goal {
-  background: var(--coral);
-  color: var(--ink);
-}
-
-.maze-step.stale {
-  background: #c9c1b2;
-  color: #6f675c;
-}
-
-.maze-step.fog {
-  background:
-    repeating-linear-gradient(135deg, rgb(36 49 43 / 15%) 0 5px, transparent 5px 10px),
-    #ddd4c2;
-  color: transparent;
 }
 
 .maze-card {
@@ -768,10 +695,6 @@ h1 {
 
   .maze-path {
     width: min(100%, 42svh, 430px);
-  }
-
-  .maze-step {
-    border-width: 1px;
   }
 
   .maze-card {
