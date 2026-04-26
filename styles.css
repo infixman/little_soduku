@@ -145,7 +145,7 @@ h1 {
 }
 
 .operator-picker {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .maze-size-picker {
@@ -371,6 +371,7 @@ h1 {
 .maze-step.visited {
   background: var(--mint);
   color: var(--ink);
+  cursor: pointer;
 }
 
 .maze-step.player {
@@ -382,6 +383,12 @@ h1 {
 .maze-step.goal {
   background: var(--coral);
   color: var(--ink);
+}
+
+.maze-step.stale {
+  border-color: #a9a194;
+  background: #c9c1b2;
+  color: #6f675c;
 }
 
 .maze-step.fog {
@@ -744,7 +751,7 @@ h1 {
   }
 
   .operator-picker {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .maze-size-picker {

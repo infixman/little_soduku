@@ -55,16 +55,16 @@ let mode = "sudoku";
 let level = "starter";
 let activeApp = "sudoku";
 let mazeGrade = 1;
-let mazeOperator = "add";
+let mazeOperators = ["add", "subtract", "multiply", "divide"];
 let mazeSize = 5;
 let fogSize = 2;
-let mazeIndex = 0;
 let mazePosition = { row: 0, col: 0 };
 let mazeRoute = [];
 let mazeOpenCells = new Set();
 let mazeSeenCells = new Set();
+let playerPath = [];
+let abandonedPaths = [];
 let mazeCurrentQuestion = null;
-let mazeFeedback = null;
 let puzzleIndex = 0;
 let solution = [];
 let board = [];
@@ -175,17 +175,17 @@ function seededScore(row, col, seed) {
 
 function startMaze() {
   gameTitle.textContent = "算術迷宮";
-  ruleLabel.textContent = `${mazeGrade} 年級 ${getOperatorLabel(mazeOperator)} ${mazeSize}x${mazeSize}`;
+  ruleLabel.textContent = `${mazeGrade} 年級 ${getOperatorSummary()} ${mazeSize}x${mazeSize}`;
   const generatedMaze = generateMazeMap(mazeSize, puzzleIndex);
   mazeRoute = generatedMaze.route;
   mazeOpenCells = generatedMaze.openCells;
   mazeSeenCells = new Set();
-  mazeIndex = 0;
   mazePosition = { row: mazeRoute[0][0], col: mazeRoute[0][1] };
+  playerPath = [{ ...mazePosition }];
+  abandonedPaths = [];
   revealAround(mazePosition.row, mazePosition.col);
   mazeCurrentQuestion = makeMazeMoveQuestion();
-  mazeFeedback = null;
-  mazeMessageEl.textContent = "看地圖，選出正確答案的方向。";
+  mazeMessageEl.textContent = "看地圖，選答案決定要往哪裡走。";
   mazeMessageEl.classList.remove("win");
   renderMaze();
 }
@@ -262,18 +262,16 @@ function cellKey(row, col) {
 }
 
 function makeMazeMoveQuestion() {
-  const index = mazeIndex;
-  const operators = mazeOperator === "mixed"
-    ? getOperatorsForGrade(mazeGrade)
-    : [mazeOperator];
+  const index = playerPath.length - 1;
+  const operators = mazeOperators.length ? mazeOperators : ["add"];
   const operator = operators[Math.floor(seededScore(index, mazeGrade, puzzleIndex) * operators.length)];
   const question = buildArithmeticQuestion(mazeGrade, operator, index + puzzleIndex * 13);
-  const nextCell = mazeRoute[Math.min(mazeIndex + 1, mazeRoute.length - 1)];
-  const correctDirection = getDirectionTo(nextCell[0], nextCell[1]);
+  const correctDirection = getDirectionTowardGoal();
+  const options = makeDirectionalOptions(question.answer, correctDirection, mazeGrade, index);
 
   return {
     ...question,
-    options: makeDirectionalOptions(question.answer, correctDirection, mazeGrade, index),
+    options,
   };
 }
 
@@ -329,11 +327,16 @@ function makeAnswerOptions(answer, grade, seed) {
 }
 
 function makeDirectionalOptions(answer, correctDirection, grade, seed) {
+  const availableDirections = getOpenNeighborDirections();
+  if (!correctDirection) {
+    return [];
+  }
+
   const answers = makeAnswerOptions(answer, grade, seed).filter((value) => value !== answer);
-  const wrongDirections = mazeDirections
+  const wrongDirections = availableDirections
     .filter((direction) => direction.key !== correctDirection.key)
     .sort((a, b) => seededScore(seed, a.row + a.col, puzzleIndex) - seededScore(seed, b.row + b.col, puzzleIndex))
-    .slice(0, 2);
+    .slice(0, 3);
 
   return [
     { direction: correctDirection, answer, correct: true },
@@ -352,16 +355,18 @@ function randomInt(min, max, seed, salt) {
 function renderMaze() {
   mazePathEl.innerHTML = "";
   mazePathEl.style.setProperty("--maze-size", mazeSize);
+  const currentPathIndex = playerPath.length - 1;
 
   for (let row = 0; row < mazeSize; row += 1) {
     for (let col = 0; col < mazeSize; col += 1) {
       const step = document.createElement("div");
       step.className = "maze-step";
       const key = cellKey(row, col);
-      const routeIndex = mazeRoute.findIndex(([routeRow, routeCol]) => routeRow === row && routeCol === col);
+      const pathIndex = playerPath.findIndex((cell) => cell.row === row && cell.col === col);
+      const staleIndex = getAbandonedStepIndex(row, col);
       const isCurrent = row === mazePosition.row && col === mazePosition.col;
       const isGoal = row === mazeSize - 1 && col === mazeSize - 1;
-      const isSeen = mazeSeenCells.has(key) || isCurrent;
+      const isSeen = mazeSeenCells.has(key) || isCurrent || pathIndex >= 0 || staleIndex >= 0;
 
       if (!isSeen) {
         step.classList.add("fog");
@@ -377,9 +382,15 @@ function renderMaze() {
         step.textContent = "";
       }
 
-      if (routeIndex >= 0 && routeIndex < mazeIndex) {
+      if (staleIndex >= 0) {
+        step.classList.add("stale");
+        step.textContent = staleIndex;
+      }
+
+      if (pathIndex >= 0 && pathIndex < currentPathIndex) {
         step.classList.add("visited");
-        step.textContent = routeIndex === 0 ? "起" : routeIndex;
+        step.textContent = pathIndex === 0 ? "起" : pathIndex;
+        step.addEventListener("click", () => rewindMazeTo(pathIndex));
       }
 
       if (isCurrent) {
@@ -398,8 +409,8 @@ function renderMaze() {
     }
   }
 
-  mazeProgressEl.textContent = `第 ${Math.min(mazeIndex + 1, mazeRoute.length)} / ${mazeRoute.length} 步`;
-  if (mazeIndex >= mazeRoute.length - 1) {
+  mazeProgressEl.textContent = `第 ${playerPath.length} 步`;
+  if (isAtGoal()) {
     mazeQuestionEl.textContent = "抵達終點";
     answerGridEl.innerHTML = "";
     return;
@@ -408,59 +419,121 @@ function renderMaze() {
   mazeQuestionEl.textContent = mazeCurrentQuestion.text;
   answerGridEl.innerHTML = "";
 
+  if (!mazeCurrentQuestion.options.length) {
+    mazeQuestionEl.textContent = "這裡沒有路了";
+    mazeMessageEl.textContent = "點走過的格子回到前面重算。";
+    return;
+  }
+
   mazeCurrentQuestion.options.forEach((option) => {
     const button = document.createElement("button");
     button.className = "answer-button";
     button.type = "button";
     button.innerHTML = `<span class="answer-direction">${option.direction.label}</span>${option.answer}`;
-    if (mazeFeedback?.answer === option.answer) {
-      button.classList.add(mazeFeedback.type);
-    }
     button.addEventListener("click", () => answerMazeQuestion(option));
     answerGridEl.append(button);
   });
 }
 
 function answerMazeQuestion(option) {
-  const correct = option.correct;
-  mazeFeedback = { answer: option.answer, type: correct ? "good" : "think" };
-  playFeedbackSound(correct ? "good" : "think");
-  vibrate(correct ? 18 : 10);
-
-  if (!correct) {
-    mazeMessageEl.textContent = `${option.direction.label} 邊不是這題答案，再看一次。`;
-    mazeMessageEl.classList.remove("win");
-    renderMaze();
-    return;
-  }
-
-  mazeIndex += 1;
-  const nextCell = mazeRoute[Math.min(mazeIndex, mazeRoute.length - 1)];
-  mazePosition = { row: nextCell[0], col: nextCell[1] };
+  mazePosition = {
+    row: mazePosition.row + option.direction.row,
+    col: mazePosition.col + option.direction.col,
+  };
+  playerPath.push({ ...mazePosition });
   revealAround(mazePosition.row, mazePosition.col);
+  playFeedbackSound("move");
+  vibrate(12);
 
-  if (mazeIndex >= mazeRoute.length - 1) {
+  if (isAtGoal()) {
     mazeMessageEl.textContent = "走到終點了！重開迷宮繼續玩。";
     mazeMessageEl.classList.add("win");
     playFeedbackSound("win");
     celebrate();
   } else {
     mazeCurrentQuestion = makeMazeMoveQuestion();
-    mazeMessageEl.textContent = `答對了，往${option.direction.label}走。`;
-    mazeMessageEl.classList.add("win");
+    mazeMessageEl.textContent = `往${option.direction.label}走了一步。`;
+    mazeMessageEl.classList.remove("win");
   }
 
-  window.setTimeout(() => {
-    mazeFeedback = null;
-    renderMaze();
-  }, 220);
   renderMaze();
 }
 
-function getDirectionTo(nextRow, nextCol) {
-  const rowDelta = nextRow - mazePosition.row;
-  const colDelta = nextCol - mazePosition.col;
-  return mazeDirections.find((direction) => direction.row === rowDelta && direction.col === colDelta);
+function rewindMazeTo(pathIndex) {
+  if (pathIndex < 0 || pathIndex >= playerPath.length - 1) return;
+
+  const discarded = playerPath.slice(pathIndex + 1);
+  if (discarded.length) {
+    abandonedPaths.push({ startStep: pathIndex + 2, cells: discarded });
+  }
+
+  playerPath = playerPath.slice(0, pathIndex + 1);
+  mazePosition = { ...playerPath[playerPath.length - 1] };
+  mazeCurrentQuestion = makeMazeMoveQuestion();
+  mazeMessageEl.textContent = `回到第 ${pathIndex + 1} 步，灰色是剛剛走過的路。`;
+  mazeMessageEl.classList.remove("win");
+  renderMaze();
+}
+
+function getOpenNeighborDirections() {
+  return mazeDirections.filter((direction) => {
+    const row = mazePosition.row + direction.row;
+    const col = mazePosition.col + direction.col;
+    return isInMaze(row, col) && mazeOpenCells.has(cellKey(row, col));
+  });
+}
+
+function getDirectionTowardGoal() {
+  const path = findPathToGoal();
+  if (path.length < 2) {
+    return null;
+  }
+
+  const next = path[1];
+  return mazeDirections.find((direction) =>
+    mazePosition.row + direction.row === next.row &&
+    mazePosition.col + direction.col === next.col
+  );
+}
+
+function findPathToGoal() {
+  const goal = { row: mazeSize - 1, col: mazeSize - 1 };
+  const start = { ...mazePosition };
+  const queue = [[start]];
+  const visited = new Set([cellKey(start.row, start.col)]);
+
+  while (queue.length) {
+    const path = queue.shift();
+    const current = path[path.length - 1];
+    if (current.row === goal.row && current.col === goal.col) {
+      return path;
+    }
+
+    mazeDirections.forEach((direction) => {
+      const row = current.row + direction.row;
+      const col = current.col + direction.col;
+      const key = cellKey(row, col);
+      if (!isInMaze(row, col) || !mazeOpenCells.has(key) || visited.has(key)) return;
+
+      visited.add(key);
+      queue.push([...path, { row, col }]);
+    });
+  }
+
+  return [];
+}
+
+function getAbandonedStepIndex(row, col) {
+  for (const path of abandonedPaths) {
+    const index = path.cells.findIndex((cell) => cell.row === row && cell.col === col);
+    if (index >= 0) return path.startStep + index;
+  }
+
+  return -1;
+}
+
+function isAtGoal() {
+  return mazePosition.row === mazeSize - 1 && mazePosition.col === mazeSize - 1;
 }
 
 function getOperatorLabel(operator) {
@@ -471,6 +544,10 @@ function getOperatorLabel(operator) {
     divide: "除法",
     mixed: "混合",
   }[operator];
+}
+
+function getOperatorSummary() {
+  return mazeOperators.map(getOperatorLabel).join("、");
 }
 
 function renderBoard() {
@@ -746,6 +823,7 @@ function playFeedbackSound(type) {
     good: { frequency: 659.25, duration: 0.07, gain: 0.045 },
     think: { frequency: 246.94, duration: 0.08, gain: 0.035 },
     clear: { frequency: 392, duration: 0.05, gain: 0.03 },
+    move: { frequency: 523.25, duration: 0.045, gain: 0.03 },
   }[type];
 
   if (settings) {
@@ -886,9 +964,19 @@ gradeButtons.forEach((button) => {
 
 operatorButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    operatorButtons.forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    mazeOperator = button.dataset.operator;
+    const nextOperators = new Set(mazeOperators);
+    if (nextOperators.has(button.dataset.operator)) {
+      nextOperators.delete(button.dataset.operator);
+    } else {
+      nextOperators.add(button.dataset.operator);
+    }
+
+    if (!nextOperators.size) return;
+
+    mazeOperators = [...nextOperators];
+    operatorButtons.forEach((item) => {
+      item.classList.toggle("active", mazeOperators.includes(item.dataset.operator));
+    });
     puzzleIndex = 0;
     startGame();
   });
